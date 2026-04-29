@@ -104,15 +104,17 @@ std::vector<Token> Lexer::tokenize() {
           {.type = TokenType::RIGHT_PAREN, .value = ";", .line = currentLine});
     } break;
     }
-    if (std::isalpha(this->current())) {
+    if (std::isalnum(this->current())) {
       int i = this->pos;
-      while (std::isalpha(this->current())) {
-        i++;
+      while (std::isalnum(this->current())) {
+        this->advance();
       }
-      std::string word = query.substr(this->pos, i - this->pos);
-      if (isKeyword(word)) {
-        // TODO: Identify what kind of keyword it is
-      }
+
+      std::string word = query.substr(this->pos, this->pos - i);
+      word = toUpper(word);
+      tokens.push_back(
+          {.type = getTokenType(word), .value = word, .line = currentLine});
+      continue;
     }
     this->advance();
   }

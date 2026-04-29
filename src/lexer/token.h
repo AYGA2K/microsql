@@ -55,4 +55,6 @@ struct Token {
   int line;
 };
 
-bool isKeyword(std::string word);
+std::string toUpper(std::string s);
+
+TokenType getTokenType(std::string word);
