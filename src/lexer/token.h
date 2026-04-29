@@ -20,17 +20,39 @@ enum class TokenType {
   ROLLBACK,
   AND,
   OR,
-  NOT,
   TKNULL,
   TRUE,
   FALSE,
   INTEGER,
   FLOAT,
   TEXT,
-  BOOLEAN
+  BOOLEAN,
+  IDENTIFIER,
+  INTEGER_LITERAL,
+  FLOAT_LITERAL,
+  STRING_LITERAL,
+  EQUAL,
+  NOT_EQUAL,
+  LESS_THAN,
+  LESS_EQ,
+  GREATER_THAN,
+  GREATER_EQ,
+  PLUS,
+  MINUS,
+  STAR,
+  SLASH,
+  COMMA,
+  SEMICOLON,
+  LEFT_PAREN,
+  RIGHT_PAREN,
+  DOT,
+  END_OF_FILE,
+  UNKNOWN
 };
 struct Token {
   TokenType type;
   std::string value;
   int line;
 };
+
+bool isKeyword(std::string word);
