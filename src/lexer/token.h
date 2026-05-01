@@ -54,6 +54,9 @@ struct Token {
   std::string value;
   int line;
 };
+std::string toString(const Token &token);
+
+std::string toString(TokenType type);
 
 std::string toUpper(std::string s);
 

@@ -1,0 +1,13 @@
+[
+  {
+    "label": "Debug microsql (CodeLLDB)",
+    "adapter": "CodeLLDB",
+    "request": "launch",
+    "program": "$GRAM_WORKTREE_ROOT/build/microsql",
+    "cwd": "$GRAM_WORKTREE_ROOT",
+    "build": {
+      "command": "make",
+      "args": ["build"]
+    }
+  }
+]

@@ -3,7 +3,7 @@
 #include <vector>
 struct Lexer {
   std::string query;
-  int pos;
+  int pos = 0;
   void advance();
   char current();
   char peek();

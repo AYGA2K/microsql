@@ -6,13 +6,13 @@
 
 void Lexer::advance() { this->pos++; }
 char Lexer::peek() {
-  if (pos + 1 < query.size()) {
+  if (pos + 1 < static_cast<int>(query.size())) {
     return this->query[pos + 1];
   }
   return '\0';
 }
 char Lexer::current() {
-  if (this->pos < this->query.size()) {
+  if (this->pos < static_cast<int>(query.size())) {
     return this->query[pos];
   }
   return '\0';
@@ -23,6 +23,8 @@ std::vector<Token> Lexer::tokenize() {
   while (this->current() != '\0') {
     char c = this->current();
     switch (c) {
+    case ' ':
+      break;
     case '\n': {
       currentLine++;
     } break;
@@ -72,6 +74,13 @@ std::vector<Token> Lexer::tokenize() {
           {.type = TokenType::PLUS, .value = "+", .line = currentLine});
     } break;
     case '-': {
+      // Comments start with -- until the end of the line
+      if (this->peek() == '-') {
+        while (this->current() != '\n') {
+          this->advance();
+        }
+        break;
+      }
       tokens.push_back(
           {.type = TokenType::MINUS, .value = "-", .line = currentLine});
     } break;
@@ -110,7 +119,7 @@ std::vector<Token> Lexer::tokenize() {
         this->advance();
       }
 
-      std::string word = query.substr(this->pos, this->pos - i);
+      std::string word = query.substr(i, this->pos - i);
       word = toUpper(word);
       tokens.push_back(
           {.type = getTokenType(word), .value = word, .line = currentLine});
@@ -118,9 +127,7 @@ std::vector<Token> Lexer::tokenize() {
     }
     this->advance();
   }
-  tokens.push_back({
-      .type = TokenType::END_OF_FILE,
-      .value = "\0",
-  });
+  tokens.push_back(
+      {.type = TokenType::END_OF_FILE, .value = "\0", .line = currentLine});
   return tokens;
 }
