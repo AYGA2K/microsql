@@ -1,3 +1,0 @@
-/home/ayoub/code/microsql/build/CMakeFiles/microsql.dir
-/home/ayoub/code/microsql/build/CMakeFiles/edit_cache.dir
-/home/ayoub/code/microsql/build/CMakeFiles/rebuild_cache.dir
