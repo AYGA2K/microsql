@@ -1,6 +1,6 @@
 BUILD_DIR := build
 
-.PHONY: all config build run clean
+.PHONY: all config build run test clean
 
 all: build run
 
@@ -12,6 +12,10 @@ build:
 
 run:
 	./$(BUILD_DIR)/microsql
+
+test:
+	cmake --build $(BUILD_DIR) --target lexer_test
+	./$(BUILD_DIR)/lexer_test
 
 clean:
 	rm -rf $(BUILD_DIR)
