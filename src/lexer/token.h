@@ -47,7 +47,8 @@ enum class TokenType {
   RIGHT_PAREN,
   DOT,
   END_OF_FILE,
-  UNKNOWN
+  UNKNOWN,
+  ERROR
 };
 struct Token {
   TokenType type;

@@ -1,4 +1,9 @@
 #include "token.h"
+#include "fmt/base.h"
+#include <charconv>
+#include <iostream>
+#include <string_view>
+#include <system_error>
 #include <unordered_map>
 
 std::string toUpper(std::string s) {
@@ -6,6 +11,25 @@ std::string toUpper(std::string s) {
     c = std::toupper(static_cast<unsigned char>(c));
   }
   return s;
+}
+bool isInt(std::string_view s) {
+  if (s.empty()) {
+    return false;
+  }
+  int value;
+  // Parse characters into a number
+  auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), value);
+  return ec == std::errc() && ptr == s.data() + s.size();
+}
+
+bool isFLoat(std::string_view s) {
+  if (s.empty()) {
+    return false;
+  }
+  float value;
+  // Parse characters into a float
+  auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), value);
+  return ec == std::errc() && ptr == s.data() + s.size();
 }
 TokenType getTokenType(std::string word) {
   static const std::unordered_map<std::string, TokenType> keywordMap = {
@@ -35,9 +59,15 @@ TokenType getTokenType(std::string word) {
       {"FLOAT", TokenType::FLOAT},
       {"TEXT", TokenType::TEXT},
       {"BOOLEAN", TokenType::BOOLEAN}};
-  auto it = keywordMap.find(word);
+  auto it = keywordMap.find(toUpper(word));
   if (it != keywordMap.end()) {
     return it->second;
+  }
+  if (isInt(word)) {
+    return TokenType::INTEGER_LITERAL;
+  }
+  if (isFLoat(word)) {
+    return TokenType::FLOAT_LITERAL;
   }
   return TokenType::IDENTIFIER;
 }

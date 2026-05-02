@@ -1,6 +1,7 @@
 #include "lexer.h"
 #include "token.h"
 #include <cctype>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -102,28 +103,46 @@ std::vector<Token> Lexer::tokenize() {
     } break;
     case '.': {
       tokens.push_back(
-          {.type = TokenType::DOT, .value = ";", .line = currentLine});
+          {.type = TokenType::DOT, .value = ".", .line = currentLine});
     } break;
     case '(': {
       tokens.push_back(
-          {.type = TokenType::LEFT_PAREN, .value = ";", .line = currentLine});
+          {.type = TokenType::LEFT_PAREN, .value = "(", .line = currentLine});
     } break;
     case ')': {
       tokens.push_back(
-          {.type = TokenType::RIGHT_PAREN, .value = ";", .line = currentLine});
+          {.type = TokenType::RIGHT_PAREN, .value = ")", .line = currentLine});
     } break;
-    }
-    if (std::isalnum(this->current())) {
-      int i = this->pos;
-      while (std::isalnum(this->current())) {
+    case '\'': {
+      int i = this->pos + 1;
+      this->advance();
+      while (this->current() != '\'' && this->current() != '\0') {
         this->advance();
       }
+      if (this->pos == static_cast<int>(this->query.size())) {
+        tokens.push_back({.type = TokenType::ERROR,
+                          .value = "Unterminated string literal",
+                          .line = currentLine});
+        break;
+      }
+      std::string literal = query.substr(i, this->pos - i);
+      tokens.push_back({.type = TokenType::STRING_LITERAL,
+                        .value = literal,
+                        .line = currentLine});
+    } break;
+    default: {
+      if (std::isalnum(this->current())) {
+        int i = this->pos;
+        while (std::isalnum(this->current()) || this->current() == '.') {
+          this->advance();
+        }
 
-      std::string word = query.substr(i, this->pos - i);
-      word = toUpper(word);
-      tokens.push_back(
-          {.type = getTokenType(word), .value = word, .line = currentLine});
-      continue;
+        std::string word = query.substr(i, this->pos - i);
+        tokens.push_back(
+            {.type = getTokenType(word), .value = word, .line = currentLine});
+        continue;
+      }
+    }
     }
     this->advance();
   }

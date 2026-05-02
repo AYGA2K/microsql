@@ -1,3 +1,5 @@
+#include "lexer/token.h"
+#include <iostream>
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "lexer/lexer.h"
 #include <doctest/doctest.h>
@@ -52,7 +54,10 @@ TEST_CASE("SELECT with float literal") {
 
 TEST_CASE("INSERT INTO") {
   auto tokens = lex("INSERT INTO users VALUES (1, 'alice');");
-  REQUIRE(tokens.size() == 10);
+  for (auto token : tokens) {
+    std::cout << toString(token) << std::endl;
+  }
+  REQUIRE(tokens.size() == 11);
   CHECK(tokens[0].type == TokenType::INSERT);
   CHECK(tokens[1].type == TokenType::INTO);
   CHECK(tokens[2].type == TokenType::IDENTIFIER);
@@ -65,6 +70,7 @@ TEST_CASE("INSERT INTO") {
   CHECK(tokens[7].value == "alice");
   CHECK(tokens[8].type == TokenType::RIGHT_PAREN);
   CHECK(tokens[9].type == TokenType::SEMICOLON);
+  CHECK(tokens[10].type == TokenType::END_OF_FILE);
 }
 
 TEST_CASE("UPDATE SET") {
@@ -80,6 +86,8 @@ TEST_CASE("UPDATE SET") {
   CHECK(tokens[7].type == TokenType::IDENTIFIER);
   CHECK(tokens[8].type == TokenType::EQUAL);
   CHECK(tokens[9].type == TokenType::INTEGER_LITERAL);
+  CHECK(tokens[10].type == TokenType::SEMICOLON);
+  CHECK(tokens[11].type == TokenType::END_OF_FILE);
 }
 
 TEST_CASE("DELETE") {
@@ -92,6 +100,8 @@ TEST_CASE("DELETE") {
   CHECK(tokens[4].type == TokenType::IDENTIFIER);
   CHECK(tokens[5].type == TokenType::EQUAL);
   CHECK(tokens[6].type == TokenType::INTEGER_LITERAL);
+  CHECK(tokens[7].type == TokenType::SEMICOLON);
+  CHECK(tokens[8].type == TokenType::END_OF_FILE);
 }
 
 TEST_CASE("CREATE TABLE") {
@@ -108,14 +118,17 @@ TEST_CASE("CREATE TABLE") {
   CHECK(tokens[8].type == TokenType::TEXT);
   CHECK(tokens[9].type == TokenType::RIGHT_PAREN);
   CHECK(tokens[10].type == TokenType::SEMICOLON);
+  CHECK(tokens[11].type == TokenType::END_OF_FILE);
 }
 
 TEST_CASE("DROP TABLE") {
   auto tokens = lex("DROP TABLE users;");
-  REQUIRE(tokens.size() == 4);
+  REQUIRE(tokens.size() == 5);
   CHECK(tokens[0].type == TokenType::DROP);
   CHECK(tokens[1].type == TokenType::TABLE);
   CHECK(tokens[2].type == TokenType::IDENTIFIER);
+  CHECK(tokens[3].type == TokenType::SEMICOLON);
+  CHECK(tokens[4].type == TokenType::END_OF_FILE);
 }
 
 TEST_CASE("transaction block") {
@@ -125,6 +138,7 @@ TEST_CASE("transaction block") {
   CHECK(tokens[1].type == TokenType::SEMICOLON);
   CHECK(tokens[2].type == TokenType::COMMIT);
   CHECK(tokens[3].type == TokenType::SEMICOLON);
+  CHECK(tokens[4].type == TokenType::END_OF_FILE);
 }
 
 TEST_CASE("WHERE with AND / OR") {
@@ -134,7 +148,8 @@ TEST_CASE("WHERE with AND / OR") {
 }
 
 TEST_CASE("WHERE with comparison operators") {
-  auto tokens = lex("SELECT * FROM t WHERE a != 1 AND b <= 2 AND c >= 3 AND d <> 4;");
+  auto tokens =
+      lex("SELECT * FROM t WHERE a != 1 AND b <= 2 AND c >= 3 AND d <> 4;");
   CHECK(tokens[6].type == TokenType::NOT_EQUAL);
   CHECK(tokens[10].type == TokenType::LESS_EQ);
   CHECK(tokens[14].type == TokenType::GREATER_EQ);
