@@ -1,5 +1,4 @@
 #include "lexer/token.h"
-#include <iostream>
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "lexer/lexer.h"
 #include <doctest/doctest.h>
@@ -240,14 +239,15 @@ TEST_CASE("line numbers are tracked") {
 
 TEST_CASE("dotted identifier (table.column)") {
   auto tokens = lex("SELECT u.name FROM u;");
-
-  for (auto token : tokens) {
-    std::cout << toString(token) << std::endl;
-  }
-  REQUIRE(tokens.size() == 7);
+  REQUIRE(tokens.size() == 8);
+  CHECK(tokens[0].type == TokenType::SELECT);
   CHECK(tokens[1].type == TokenType::IDENTIFIER);
   CHECK(tokens[2].type == TokenType::DOT);
   CHECK(tokens[3].type == TokenType::IDENTIFIER);
+  CHECK(tokens[4].type == TokenType::FROM);
+  CHECK(tokens[5].type == TokenType::IDENTIFIER);
+  CHECK(tokens[6].type == TokenType::SEMICOLON);
+  CHECK(tokens[7].type == TokenType::END_OF_FILE);
 }
 
 TEST_CASE("empty input") {

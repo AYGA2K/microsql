@@ -1,7 +1,6 @@
 #include "lexer.h"
 #include "token.h"
 #include <cctype>
-#include <iostream>
 #include <string>
 #include <vector>
 
@@ -131,15 +130,28 @@ std::vector<Token> Lexer::tokenize() {
                         .line = currentLine});
     } break;
     default: {
-      if (std::isalnum(this->current())) {
-        int i = this->pos;
-        while (std::isalnum(this->current()) || this->current() == '.') {
-          this->advance();
+      if (std::isalpha(current()) || current() == '_') {
+        int i = pos;
+        while (std::isalnum(current()) || current() == '_') {
+          advance();
         }
 
-        std::string word = query.substr(i, this->pos - i);
-        tokens.push_back(
-            {.type = getTokenType(word), .value = word, .line = currentLine});
+        std::string word = query.substr(i, pos - i);
+        tokens.push_back({getTokenType(word), word, currentLine});
+        continue;
+      }
+      if (std::isdigit(current())) {
+        int i = pos;
+        bool hasDot = false;
+
+        while (std::isdigit(current()) || (!hasDot && current() == '.')) {
+          if (current() == '.')
+            hasDot = true;
+          advance();
+        }
+
+        std::string num = query.substr(i, pos - i);
+        tokens.push_back({getTokenType(num), num, currentLine});
         continue;
       }
     }
