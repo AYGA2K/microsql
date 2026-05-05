@@ -137,7 +137,7 @@ std::vector<Token> Lexer::tokenize() {
         }
 
         std::string word = query.substr(i, pos - i);
-        tokens.push_back({getTokenType(word), word, currentLine});
+        tokens.push_back({getTokenTypeAlpha(word), word, currentLine});
         continue;
       }
       if (std::isdigit(current())) {
@@ -151,7 +151,7 @@ std::vector<Token> Lexer::tokenize() {
         }
 
         std::string num = query.substr(i, pos - i);
-        tokens.push_back({getTokenType(num), num, currentLine});
+        tokens.push_back({getTokenTypeDigit(num), num, currentLine});
         continue;
       }
     }

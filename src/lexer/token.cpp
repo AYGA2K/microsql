@@ -1,7 +1,5 @@
 #include "token.h"
-#include "fmt/base.h"
 #include <charconv>
-#include <iostream>
 #include <string_view>
 #include <system_error>
 #include <unordered_map>
@@ -31,7 +29,7 @@ bool isFLoat(std::string_view s) {
   auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), value);
   return ec == std::errc() && ptr == s.data() + s.size();
 }
-TokenType getTokenType(std::string word) {
+TokenType getTokenTypeAlpha(std::string word) {
   static const std::unordered_map<std::string, TokenType> keywordMap = {
       {"SELECT", TokenType::SELECT},
       {"FROM", TokenType::FROM},
@@ -63,13 +61,16 @@ TokenType getTokenType(std::string word) {
   if (it != keywordMap.end()) {
     return it->second;
   }
+  return TokenType::IDENTIFIER;
+}
+TokenType getTokenTypeDigit(std::string word) {
   if (isInt(word)) {
     return TokenType::INTEGER_LITERAL;
   }
   if (isFLoat(word)) {
     return TokenType::FLOAT_LITERAL;
   }
-  return TokenType::IDENTIFIER;
+  return TokenType::UNKNOWN;
 }
 
 std::string toString(TokenType type) {
