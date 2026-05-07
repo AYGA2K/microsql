@@ -1,9 +1,10 @@
 #pragma once
 #include "token.h"
+#include <cstddef>
 #include <vector>
 struct Lexer {
   std::string query;
-  int pos = 0;
+  size_t position = 0;
   void advance();
   char current();
   char peek();

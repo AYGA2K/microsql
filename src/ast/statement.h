@@ -50,6 +50,6 @@ struct Statement {
   // --- CREATE INDEX ---
   std::string indexColumnName;
 
-  // --- DROP TABLE / BEGIN / COMMIT / ROLLBACK ---
+  // --- DROP TABLE ---
   // tableName only
 };

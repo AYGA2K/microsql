@@ -59,8 +59,6 @@ std::string toString(const Token &token);
 
 std::string toString(TokenType type);
 
-std::string toUpper(std::string s);
-
 TokenType getTokenTypeAlpha(std::string word);
 
 TokenType getTokenTypeDigit(std::string word);

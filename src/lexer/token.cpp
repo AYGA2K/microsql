@@ -4,7 +4,7 @@
 #include <system_error>
 #include <unordered_map>
 
-std::string toUpper(std::string s) {
+static std::string toUpper(std::string s) {
   for (char &c : s) {
     c = std::toupper(static_cast<unsigned char>(c));
   }

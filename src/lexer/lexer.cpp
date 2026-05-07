@@ -4,16 +4,16 @@
 #include <string>
 #include <vector>
 
-void Lexer::advance() { this->pos++; }
+void Lexer::advance() { this->position++; }
 char Lexer::peek() {
-  if (pos + 1 < static_cast<int>(query.size())) {
-    return this->query[pos + 1];
+  if (this->position + 1 < query.size()) {
+    return this->query[this->position + 1];
   }
   return '\0';
 }
 char Lexer::current() {
-  if (this->pos < static_cast<int>(query.size())) {
-    return this->query[pos];
+  if (this->position < query.size()) {
+    return this->query[this->position];
   }
   return '\0';
 }
@@ -113,35 +113,35 @@ std::vector<Token> Lexer::tokenize() {
           {.type = TokenType::RIGHT_PAREN, .value = ")", .line = currentLine});
     } break;
     case '\'': {
-      int i = this->pos + 1;
+      int i = this->position + 1;
       this->advance();
       while (this->current() != '\'' && this->current() != '\0') {
         this->advance();
       }
-      if (this->pos == static_cast<int>(this->query.size())) {
+      if (this->position == this->query.size()) {
         tokens.push_back({.type = TokenType::ERROR,
                           .value = "Unterminated string literal",
                           .line = currentLine});
         break;
       }
-      std::string literal = query.substr(i, this->pos - i);
+      std::string literal = query.substr(i, this->position - i);
       tokens.push_back({.type = TokenType::STRING_LITERAL,
                         .value = literal,
                         .line = currentLine});
     } break;
     default: {
       if (std::isalpha(current()) || current() == '_') {
-        int i = pos;
+        size_t i = this->position;
         while (std::isalnum(current()) || current() == '_') {
           advance();
         }
 
-        std::string word = query.substr(i, pos - i);
+        std::string word = query.substr(i, this->position - i);
         tokens.push_back({getTokenTypeAlpha(word), word, currentLine});
         continue;
       }
       if (std::isdigit(current())) {
-        int i = pos;
+        size_t i = this->position;
         bool hasDot = false;
 
         while (std::isdigit(current()) || (!hasDot && current() == '.')) {
@@ -150,7 +150,7 @@ std::vector<Token> Lexer::tokenize() {
           advance();
         }
 
-        std::string num = query.substr(i, pos - i);
+        std::string num = query.substr(i, this->position - i);
         tokens.push_back({getTokenTypeDigit(num), num, currentLine});
         continue;
       }
