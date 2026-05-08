@@ -21,10 +21,12 @@ FetchContent_MakeAvailable(fmt doctest)
 set(SOURCES
     src/lexer/token.cpp
     src/lexer/lexer.cpp
+    src/parser/parser.cpp
 )
 
 set(TEST_SOURCES
     tests/lexer_test.cpp
+    tests/parser_test.cpp
 )
 
 add_library(microsql_lib ${SOURCES})
