@@ -9,5 +9,16 @@
       "command": "make",
       "args": ["build"]
     }
+  },
+  {
+    "label": "Debug parser_test (CodeLLDB)",
+    "adapter": "CodeLLDB",
+    "request": "launch",
+    "program": "$GRAM_WORKTREE_ROOT/build/parser_test",
+    "cwd": "$GRAM_WORKTREE_ROOT",
+    "build": {
+      "command": "cmake",
+      "args": ["--build", "build", "--target", "parser_test"]
+    }
   }
 ]

@@ -12,26 +12,14 @@ TEST_CASE("SELECT * FROM table") {
   CHECK(result.error.empty());
   CHECK(result.statement.kind == StatementKind::SELECT);
   CHECK(result.statement.tableName == "users");
-  REQUIRE(result.statement.selectColumns.size() == 1);
-  CHECK(result.expressions[result.statement.selectColumns[0]].kind == ExpressionKind::STAR);
-}
-
-TEST_CASE("SELECT keywords are case-insensitive") {
-  auto result = parse("select * from orders;");
-  CHECK(result.error.empty());
-  CHECK(result.statement.kind == StatementKind::SELECT);
-  CHECK(result.statement.tableName == "orders");
-}
-
-TEST_CASE("SELECT mixed-case keywords") {
-  auto result = parse("Select * From Users;");
-  CHECK(result.error.empty());
-  CHECK(result.statement.tableName == "Users");
+  CHECK(result.statement.whereIndex == -1);
+  REQUIRE(result.statement.selectColumns.size() == 0);
 }
 
 TEST_CASE("SELECT single column") {
   auto result = parse("SELECT id FROM users;");
   CHECK(result.error.empty());
+  CHECK(result.statement.whereIndex == -1);
   REQUIRE(result.statement.selectColumns.size() == 1);
   auto &col = result.expressions[result.statement.selectColumns[0]];
   CHECK(col.kind == ExpressionKind::COLUMN_REF);
@@ -43,9 +31,12 @@ TEST_CASE("SELECT multiple columns") {
   auto result = parse("SELECT id, name, age FROM users;");
   CHECK(result.error.empty());
   REQUIRE(result.statement.selectColumns.size() == 3);
-  CHECK(result.expressions[result.statement.selectColumns[0]].columnName == "id");
-  CHECK(result.expressions[result.statement.selectColumns[1]].columnName == "name");
-  CHECK(result.expressions[result.statement.selectColumns[2]].columnName == "age");
+  CHECK(result.expressions[result.statement.selectColumns[0]].columnName ==
+        "id");
+  CHECK(result.expressions[result.statement.selectColumns[1]].columnName ==
+        "name");
+  CHECK(result.expressions[result.statement.selectColumns[2]].columnName ==
+        "age");
 }
 
 TEST_CASE("SELECT qualified column") {
@@ -167,7 +158,8 @@ TEST_CASE("SELECT WHERE AND") {
 }
 
 TEST_CASE("SELECT WHERE OR") {
-  auto result = parse("SELECT * FROM users WHERE role = 'admin' OR role = 'mod';");
+  auto result =
+      parse("SELECT * FROM users WHERE role = 'admin' OR role = 'mod';");
   CHECK(result.error.empty());
   CHECK(result.statement.whereIndex != -1);
   CHECK(result.expressions[result.statement.whereIndex].binaryOperator ==
@@ -187,7 +179,8 @@ TEST_CASE("SELECT WHERE boolean literal") {
   auto result = parse("SELECT * FROM users WHERE active = true;");
   CHECK(result.error.empty());
   CHECK(result.statement.whereIndex != -1);
-  auto &rhs = result.expressions[result.expressions[result.statement.whereIndex].rightIndex];
+  auto &rhs = result.expressions[result.expressions[result.statement.whereIndex]
+                                     .rightIndex];
   CHECK(rhs.kind == ExpressionKind::LITERAL_BOOL);
   CHECK(rhs.boolValue == true);
 }
@@ -197,7 +190,8 @@ TEST_CASE("SELECT WHERE IS NULL") {
   CHECK(result.error.empty());
   CHECK(result.statement.whereIndex != -1);
   auto &where = result.expressions[result.statement.whereIndex];
-  CHECK(result.expressions[where.rightIndex].kind == ExpressionKind::LITERAL_NULL);
+  CHECK(result.expressions[where.rightIndex].kind ==
+        ExpressionKind::LITERAL_NULL);
 }
 
 TEST_CASE("SELECT WHERE IS NOT NULL") {

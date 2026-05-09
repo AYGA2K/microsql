@@ -29,6 +29,8 @@ struct Statement {
   std::string tableName;
 
   // --- SELECT ---
+  // selectColumns: indices into ParseResult.expressions for each output
+  // column. Empty means SELECT * was used.
   std::vector<int> selectColumns;
   int whereIndex; // index into expressions; -1 = no WHERE clause
 
