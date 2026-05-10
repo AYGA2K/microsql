@@ -3,7 +3,6 @@
 #include "ast/statement.h"
 #include "lexer/token.h"
 #include <cstddef>
-#include <optional>
 #include <string>
 #include <vector>
 struct ParseResult {
@@ -17,6 +16,7 @@ struct Parser {
   size_t position;
   ParseResult result;
   const Token &current();
+  const Token &peek();
   void advance();
   void parseSelect();
   void parseInsert();
@@ -26,5 +26,5 @@ struct Parser {
   void parseCreateTable();
   void parseCreateIndex();
   void parseDrop();
-  std::optional<Expression> parseExpression();
+  bool parseExpression();
 };
