@@ -68,7 +68,7 @@ TEST_CASE("SELECT string literal") {
   CHECK(expr.textValue == "hello");
 }
 
-TEST_CASE("SELECT arithmetic expression") {
+TEST_CASE("SELECT addition expression") {
   auto result = parse("SELECT 1 + 2;");
   CHECK(result.error.empty());
   REQUIRE(result.statement.selectColumns.size() == 1);
@@ -79,11 +79,37 @@ TEST_CASE("SELECT arithmetic expression") {
   CHECK(result.expressions[expr.rightIndex].intValue == 2);
 }
 
-TEST_CASE("SELECT without FROM is valid") {
-  auto result = parse("SELECT 1 + 1;");
+TEST_CASE("SELECT subtract expression") {
+  auto result = parse("SELECT 1 - 5;");
   CHECK(result.error.empty());
-  CHECK(result.statement.kind == StatementKind::SELECT);
-  CHECK(result.statement.tableName.empty());
+  REQUIRE(result.statement.selectColumns.size() == 1);
+  auto &expr = result.expressions[result.statement.selectColumns[0]];
+  CHECK(expr.kind == ExpressionKind::BINARY);
+  CHECK(expr.binaryOperator == BinaryOperator::SUBTRACT);
+  CHECK(result.expressions[expr.leftIndex].intValue == 1);
+  CHECK(result.expressions[expr.rightIndex].intValue == 5);
+}
+
+TEST_CASE("SELECT multiply expression") {
+  auto result = parse("SELECT 1 * 6;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.selectColumns.size() == 1);
+  auto &expr = result.expressions[result.statement.selectColumns[0]];
+  CHECK(expr.kind == ExpressionKind::BINARY);
+  CHECK(expr.binaryOperator == BinaryOperator::MULTIPLY);
+  CHECK(result.expressions[expr.leftIndex].intValue == 1);
+  CHECK(result.expressions[expr.rightIndex].intValue == 6);
+}
+
+TEST_CASE("SELECT divide expression") {
+  auto result = parse("SELECT 9 / 4;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.selectColumns.size() == 1);
+  auto &expr = result.expressions[result.statement.selectColumns[0]];
+  CHECK(expr.kind == ExpressionKind::BINARY);
+  CHECK(expr.binaryOperator == BinaryOperator::DIVIDE);
+  CHECK(result.expressions[expr.leftIndex].intValue == 9);
+  CHECK(result.expressions[expr.rightIndex].intValue == 4);
 }
 
 TEST_CASE("SELECT WHERE integer equality") {

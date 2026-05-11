@@ -26,5 +26,13 @@ struct Parser {
   void parseCreateTable();
   void parseCreateIndex();
   void parseDrop();
-  bool parseExpression();
+
+  int parseExpression();
+  int parseAnd();
+  int parseNot();
+  int parseComparison();
+  int parseAddSubstract();
+  int parseMultiplyDivide();
+  int parseUnary();
+  int parsePrimary();
 };

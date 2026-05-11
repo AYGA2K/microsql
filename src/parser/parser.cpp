@@ -60,15 +60,15 @@ void Parser::parseSelect() {
   } else {
     while ((this->current().type != TokenType::FROM) &&
            (this->current().type != TokenType::SEMICOLON)) {
-      bool ok = this->parseExpression();
-      if (!ok) {
+      int index = this->parseExpression();
+      if (index == -1) {
         if (this->result.error.empty()) {
-          this->result.error = "Unkown Expression at line " +
+          this->result.error = "Unknown expression at line " +
                                std::to_string(this->current().line);
         }
         return;
       }
-      this->advance();
+      this->result.statement.selectColumns.push_back(index);
       if (this->current().type == TokenType::COMMA) {
         this->advance();
       }
@@ -88,59 +88,138 @@ void Parser::parseSelect() {
   }
 }
 
-bool Parser::parseExpression() {
+int Parser::parseExpression() { return this->parseAnd(); }
+
+int Parser::parseAnd() {
+  int left = this->parseNot();
+  if (left == -1) {
+    return -1;
+  }
+  while (this->current().type == TokenType::AND) {
+    this->advance();
+    int right = this->parseNot();
+    if (right == -1) {
+      return -1;
+    }
+    Expression expression;
+    expression.kind = ExpressionKind::BINARY;
+    expression.binaryOperator = BinaryOperator::AND;
+    expression.leftIndex = left;
+    expression.rightIndex = right;
+    left = static_cast<int>(this->result.expressions.size());
+    this->result.expressions.push_back(expression);
+  }
+  return left;
+}
+
+int Parser::parseNot() { return this->parseComparison(); }
+
+int Parser::parseComparison() { return this->parseAddSubstract(); }
+
+int Parser::parseAddSubstract() {
+  int left = this->parseMultiplyDivide();
+  if (left == -1) {
+    return -1;
+  }
+  while (this->current().type == TokenType::PLUS ||
+         this->current().type == TokenType::MINUS) {
+    Expression expression;
+    expression.kind = ExpressionKind::BINARY;
+    if (this->current().type == TokenType::PLUS) {
+      expression.binaryOperator = BinaryOperator::ADD;
+    } else if (this->current().type == TokenType::MINUS) {
+      expression.binaryOperator = BinaryOperator::SUBTRACT;
+    }
+    this->advance();
+    int right = this->parseMultiplyDivide();
+    if (right == -1) {
+      return -1;
+    }
+    expression.leftIndex = left;
+    expression.rightIndex = right;
+    left = static_cast<int>(this->result.expressions.size());
+    this->result.expressions.push_back(expression);
+  }
+  return left;
+}
+
+int Parser::parseMultiplyDivide() {
+  int left = parseUnary();
+  if (left == -1) {
+    return -1;
+  }
+  while (this->current().type == TokenType::STAR ||
+         this->current().type == TokenType::SLASH) {
+    Expression expression;
+    expression.kind = ExpressionKind::BINARY;
+    if (this->current().type == TokenType::STAR) {
+      expression.binaryOperator = BinaryOperator::MULTIPLY;
+    } else if (this->current().type == TokenType::SLASH) {
+      expression.binaryOperator = BinaryOperator::DIVIDE;
+    }
+    this->advance();
+    int right = this->parseUnary();
+    if (right == -1) {
+      return -1;
+    }
+    expression.leftIndex = left;
+    expression.rightIndex = right;
+    left = static_cast<int>(this->result.expressions.size());
+    this->result.expressions.push_back(expression);
+  }
+  return left;
+}
+
+int Parser::parseUnary() { return this->parsePrimary(); }
+
+int Parser::parsePrimary() {
   Expression expression;
   switch (this->current().type) {
   case TokenType::IDENTIFIER: {
-    const auto &peekToken = this->peek();
-    if ((peekToken.type != TokenType::END_OF_FILE) &&
-        peekToken.type == TokenType::DOT) {
+    if (this->peek().type == TokenType::DOT) {
       expression.tablePrefix = this->current().value;
-      expression.kind = ExpressionKind::COLUMN_REF;
       this->advance();
       if (this->peek().type == TokenType::IDENTIFIER) {
         this->advance();
       } else {
-        this->result.error = "Expreceted table name found " +
-                             this->peek().value + " at line " +
+        this->result.error = "Expected column name after '.' but found '" +
+                             this->peek().value + "' at line " +
                              std::to_string(this->current().line);
-        return false;
+        return -1;
       }
     }
     expression.columnName = this->current().value;
     expression.kind = ExpressionKind::COLUMN_REF;
-    this->result.statement.selectColumns.push_back(
-        static_cast<int>(this->result.expressions.size()));
+    int index = static_cast<int>(this->result.expressions.size());
     this->result.expressions.push_back(expression);
-    return true;
-  } break;
+    this->advance();
+    return index;
+  }
   case TokenType::INTEGER_LITERAL: {
     expression.kind = ExpressionKind::LITERAL_INT;
     expression.intValue = std::stoi(this->current().value);
-    this->result.statement.selectColumns.push_back(
-        static_cast<int>(this->result.expressions.size()));
+    int index = static_cast<int>(this->result.expressions.size());
     this->result.expressions.push_back(expression);
-    return true;
-  } break;
-
+    this->advance();
+    return index;
+  }
   case TokenType::FLOAT_LITERAL: {
     expression.kind = ExpressionKind::LITERAL_FLOAT;
     expression.floatValue = std::stof(this->current().value);
-    this->result.statement.selectColumns.push_back(
-        static_cast<int>(this->result.expressions.size()));
+    int index = static_cast<int>(this->result.expressions.size());
     this->result.expressions.push_back(expression);
-    return true;
-  } break;
-
+    this->advance();
+    return index;
+  }
   case TokenType::STRING_LITERAL: {
     expression.kind = ExpressionKind::LITERAL_TEXT;
     expression.textValue = this->current().value;
-    this->result.statement.selectColumns.push_back(
-        static_cast<int>(this->result.expressions.size()));
+    int index = static_cast<int>(this->result.expressions.size());
     this->result.expressions.push_back(expression);
-    return true;
-  } break;
+    this->advance();
+    return index;
+  }
   default:
-    return false;
+    return -1;
   }
 }
