@@ -50,6 +50,8 @@ TokenType getTokenTypeAlpha(std::string word) {
       {"ROLLBACK", TokenType::ROLLBACK},
       {"AND", TokenType::AND},
       {"OR", TokenType::OR},
+      {"NOT", TokenType::NOT},
+      {"IS", TokenType::IS},
       {"NULL", TokenType::TKNULL},
       {"TRUE", TokenType::TRUE},
       {"FALSE", TokenType::FALSE},
@@ -113,6 +115,10 @@ std::string toString(TokenType type) {
     return "AND";
   case TokenType::OR:
     return "OR";
+  case TokenType::NOT:
+    return "NOT";
+  case TokenType::IS:
+    return "IS";
   case TokenType::TKNULL:
     return "TKNULL";
   case TokenType::TRUE:

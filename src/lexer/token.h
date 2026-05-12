@@ -20,6 +20,8 @@ enum class TokenType {
   ROLLBACK,
   AND,
   OR,
+  NOT,
+  IS,
   TKNULL,
   TRUE,
   FALSE,
