@@ -90,8 +90,25 @@ void Parser::parseSelect() {
 }
 
 int Parser::parseExpression() {
-  // TODO: handle OR
-  return this->parseAnd();
+  int left = this->parseAnd();
+  if (left == -1) {
+    return -1;
+  }
+  while (this->current().type == TokenType::OR) {
+    this->advance();
+    int right = this->parseAnd();
+    if (right == -1) {
+      return -1;
+    }
+    Expression expression;
+    expression.kind = ExpressionKind::BINARY;
+    expression.binaryOperator = BinaryOperator::OR;
+    expression.leftIndex = left;
+    expression.rightIndex = right;
+    left = static_cast<int>(this->result.expressions.size());
+    this->result.expressions.push_back(expression);
+  }
+  return left;
 }
 
 int Parser::parseAnd() {
@@ -256,6 +273,15 @@ int Parser::parsePrimary() {
   case TokenType::STRING_LITERAL: {
     expression.kind = ExpressionKind::LITERAL_TEXT;
     expression.textValue = this->current().value;
+    int index = static_cast<int>(this->result.expressions.size());
+    this->result.expressions.push_back(expression);
+    this->advance();
+    return index;
+  }
+  case TokenType::TRUE:
+  case TokenType::FALSE: {
+    expression.kind = ExpressionKind::LITERAL_BOOL;
+    expression.boolValue = this->current().type == TokenType::TRUE;
     int index = static_cast<int>(this->result.expressions.size());
     this->result.expressions.push_back(expression);
     this->advance();
