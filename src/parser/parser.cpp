@@ -80,7 +80,8 @@ void Parser::parseSelect() {
       this->result.statement.tableName = this->current().value;
       this->advance();
       if (this->current().type == TokenType::WHERE) {
-        // TODO: parse where
+        this->advance();
+        this->result.statement.whereIndex = parseExpression();
       } else {
         this->result.statement.whereIndex = -1;
       }
@@ -88,7 +89,10 @@ void Parser::parseSelect() {
   }
 }
 
-int Parser::parseExpression() { return this->parseAnd(); }
+int Parser::parseExpression() {
+  // TODO: handle OR
+  return this->parseAnd();
+}
 
 int Parser::parseAnd() {
   int left = this->parseNot();
@@ -114,7 +118,45 @@ int Parser::parseAnd() {
 
 int Parser::parseNot() { return this->parseComparison(); }
 
-int Parser::parseComparison() { return this->parseAddSubstract(); }
+int Parser::parseComparison() {
+  int left = this->parseAddSubstract();
+  if (left == -1) {
+    return -1;
+  }
+  while (this->current().type == TokenType::EQUAL ||
+         this->current().type == TokenType::NOT_EQUAL ||
+         this->current().type == TokenType::LESS_THAN ||
+         this->current().type == TokenType::LESS_EQ ||
+         this->current().type == TokenType::GREATER_THAN ||
+         this->current().type == TokenType::GREATER_EQ) {
+
+    Expression expression;
+    expression.kind = ExpressionKind::BINARY;
+    if (this->current().type == TokenType::EQUAL) {
+      expression.binaryOperator = BinaryOperator::EQUAL;
+    } else if (this->current().type == TokenType::NOT_EQUAL) {
+      expression.binaryOperator = BinaryOperator::NOT_EQUAL;
+    } else if (this->current().type == TokenType::LESS_THAN) {
+      expression.binaryOperator = BinaryOperator::LESS_THAN;
+    } else if (this->current().type == TokenType::LESS_EQ) {
+      expression.binaryOperator = BinaryOperator::LESS_THAN_OR_EQUAL;
+    } else if (this->current().type == TokenType::GREATER_THAN) {
+      expression.binaryOperator = BinaryOperator::GREATER_THAN;
+    } else if (this->current().type == TokenType::GREATER_EQ) {
+      expression.binaryOperator = BinaryOperator::GREATER_THAN_OR_EQUAL;
+    }
+    this->advance();
+    int right = parseAddSubstract();
+    if (right == -1) {
+      return -1;
+    }
+    expression.leftIndex = left;
+    expression.rightIndex = right;
+    left = static_cast<int>(this->result.expressions.size());
+    this->result.expressions.push_back(expression);
+  }
+  return left;
+}
 
 int Parser::parseAddSubstract() {
   int left = this->parseMultiplyDivide();
