@@ -57,6 +57,14 @@ void Parser::parseSelect() {
   this->result.statement.kind = StatementKind::SELECT;
   if (this->current().type == TokenType::STAR) {
     this->advance();
+    if (this->current().type != TokenType::FROM &&
+        this->current().type != TokenType::SEMICOLON &&
+        this->current().type != TokenType::END_OF_FILE) {
+      this->result.error = "Syntax error at line " +
+                           std::to_string(this->current().line) +
+                           ": unexpected token '" + this->current().value + "'";
+      return;
+    }
   } else {
     while ((this->current().type != TokenType::FROM) &&
            (this->current().type != TokenType::SEMICOLON)) {
@@ -76,15 +84,29 @@ void Parser::parseSelect() {
   }
   if (this->current().type == TokenType::FROM) {
     this->advance();
-    if (this->current().type == TokenType::IDENTIFIER) {
-      this->result.statement.tableName = this->current().value;
+    if (this->current().type != TokenType::IDENTIFIER) {
+      this->result.error = "Syntax error at line " +
+                           std::to_string(this->current().line) +
+                           ": expected table name after FROM but found '" +
+                           this->current().value + "'";
+      return;
+    }
+    this->result.statement.tableName = this->current().value;
+    this->advance();
+    if (this->current().type == TokenType::WHERE) {
       this->advance();
-      if (this->current().type == TokenType::WHERE) {
-        this->advance();
-        this->result.statement.whereIndex = parseExpression();
-      } else {
-        this->result.statement.whereIndex = -1;
+      int index = this->parseExpression();
+      if (index == -1) {
+        if (this->result.error.empty()) {
+          this->result.error = "Syntax error at line " +
+                               std::to_string(this->current().line) +
+                               ": expected expression after WHERE";
+        }
+        return;
       }
+      this->result.statement.whereIndex = index;
+    } else {
+      this->result.statement.whereIndex = -1;
     }
   }
 }
@@ -133,7 +155,23 @@ int Parser::parseAnd() {
   return left;
 }
 
-int Parser::parseNot() { return this->parseComparison(); }
+int Parser::parseNot() {
+  if (this->current().type == TokenType::NOT) {
+    this->advance();
+    int operandIndex = parseComparison();
+    if (operandIndex == -1) {
+      return -1;
+    }
+    Expression expression;
+    expression.kind = ExpressionKind::UNARY;
+    expression.unaryOperator = UnaryOperator::NOT;
+    expression.operandIndex = operandIndex;
+    int index = this->result.expressions.size();
+    this->result.expressions.push_back(expression);
+    return index;
+  }
+  return this->parseComparison();
+}
 
 int Parser::parseComparison() {
   int left = this->parseAddSubstract();
@@ -145,7 +183,8 @@ int Parser::parseComparison() {
          this->current().type == TokenType::LESS_THAN ||
          this->current().type == TokenType::LESS_EQ ||
          this->current().type == TokenType::GREATER_THAN ||
-         this->current().type == TokenType::GREATER_EQ) {
+         this->current().type == TokenType::GREATER_EQ ||
+         this->current().type == TokenType::IS) {
 
     Expression expression;
     expression.kind = ExpressionKind::BINARY;
@@ -161,6 +200,13 @@ int Parser::parseComparison() {
       expression.binaryOperator = BinaryOperator::GREATER_THAN;
     } else if (this->current().type == TokenType::GREATER_EQ) {
       expression.binaryOperator = BinaryOperator::GREATER_THAN_OR_EQUAL;
+    } else if (this->current().type == TokenType::IS) {
+      if (this->peek().type == TokenType::NOT) {
+        expression.binaryOperator = BinaryOperator::IS_NOT;
+        this->advance();
+      } else {
+        expression.binaryOperator = BinaryOperator::IS;
+      }
     }
     this->advance();
     int right = parseAddSubstract();
@@ -272,6 +318,14 @@ int Parser::parsePrimary() {
   }
   case TokenType::STRING_LITERAL: {
     expression.kind = ExpressionKind::LITERAL_TEXT;
+    expression.textValue = this->current().value;
+    int index = static_cast<int>(this->result.expressions.size());
+    this->result.expressions.push_back(expression);
+    this->advance();
+    return index;
+  }
+  case TokenType::TKNULL: {
+    expression.kind = ExpressionKind::LITERAL_NULL;
     expression.textValue = this->current().value;
     int index = static_cast<int>(this->result.expressions.size());
     this->result.expressions.push_back(expression);

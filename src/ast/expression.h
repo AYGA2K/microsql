@@ -26,6 +26,8 @@ enum class BinaryOperator {
   SUBTRACT,
   MULTIPLY,
   DIVIDE,
+  IS,
+  IS_NOT,
 };
 
 enum class UnaryOperator {
@@ -52,5 +54,5 @@ struct Expression {
   int rightIndex;
 
   UnaryOperator unaryOperator;
-  int operandIndex;
+  int operandIndex; // index of the single child for unary operators
 };

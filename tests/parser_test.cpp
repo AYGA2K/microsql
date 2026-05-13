@@ -214,8 +214,12 @@ TEST_CASE("SELECT WHERE boolean literal") {
 TEST_CASE("SELECT WHERE IS NULL") {
   auto result = parse("SELECT * FROM users WHERE deleted_at IS NULL;");
   CHECK(result.error.empty());
-  CHECK(result.statement.whereIndex != -1);
+  REQUIRE(result.statement.whereIndex != -1);
   auto &where = result.expressions[result.statement.whereIndex];
+  REQUIRE(where.kind == ExpressionKind::BINARY);
+  CHECK(where.binaryOperator == BinaryOperator::IS);
+  CHECK(result.expressions[where.leftIndex].kind == ExpressionKind::COLUMN_REF);
+  CHECK(result.expressions[where.leftIndex].columnName == "deleted_at");
   CHECK(result.expressions[where.rightIndex].kind ==
         ExpressionKind::LITERAL_NULL);
 }
@@ -223,7 +227,14 @@ TEST_CASE("SELECT WHERE IS NULL") {
 TEST_CASE("SELECT WHERE IS NOT NULL") {
   auto result = parse("SELECT * FROM users WHERE email IS NOT NULL;");
   CHECK(result.error.empty());
-  CHECK(result.statement.whereIndex != -1);
+  REQUIRE(result.statement.whereIndex != -1);
+  auto &where = result.expressions[result.statement.whereIndex];
+  REQUIRE(where.kind == ExpressionKind::BINARY);
+  CHECK(where.binaryOperator == BinaryOperator::IS_NOT);
+  CHECK(result.expressions[where.leftIndex].kind == ExpressionKind::COLUMN_REF);
+  CHECK(result.expressions[where.leftIndex].columnName == "email");
+  CHECK(result.expressions[where.rightIndex].kind ==
+        ExpressionKind::LITERAL_NULL);
 }
 
 TEST_CASE("SELECT missing FROM produces error") {
