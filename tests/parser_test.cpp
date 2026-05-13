@@ -112,6 +112,42 @@ TEST_CASE("SELECT divide expression") {
   CHECK(result.expressions[expr.rightIndex].intValue == 4);
 }
 
+TEST_CASE("SELECT negate integer literal") {
+  auto result = parse("SELECT -5;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.selectColumns.size() == 1);
+  auto &expr = result.expressions[result.statement.selectColumns[0]];
+  REQUIRE(expr.kind == ExpressionKind::UNARY);
+  CHECK(expr.unaryOperator == UnaryOperator::NEGATE);
+  CHECK(result.expressions[expr.operandIndex].kind == ExpressionKind::LITERAL_INT);
+  CHECK(result.expressions[expr.operandIndex].intValue == 5);
+}
+
+TEST_CASE("SELECT negate column") {
+  auto result = parse("SELECT -age FROM users;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.selectColumns.size() == 1);
+  auto &expr = result.expressions[result.statement.selectColumns[0]];
+  REQUIRE(expr.kind == ExpressionKind::UNARY);
+  CHECK(expr.unaryOperator == UnaryOperator::NEGATE);
+  CHECK(result.expressions[expr.operandIndex].kind == ExpressionKind::COLUMN_REF);
+  CHECK(result.expressions[expr.operandIndex].columnName == "age");
+}
+
+TEST_CASE("SELECT negate in arithmetic") {
+  auto result = parse("SELECT -3 + 4;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.selectColumns.size() == 1);
+  auto &expr = result.expressions[result.statement.selectColumns[0]];
+  REQUIRE(expr.kind == ExpressionKind::BINARY);
+  CHECK(expr.binaryOperator == BinaryOperator::ADD);
+  auto &lhs = result.expressions[expr.leftIndex];
+  REQUIRE(lhs.kind == ExpressionKind::UNARY);
+  CHECK(lhs.unaryOperator == UnaryOperator::NEGATE);
+  CHECK(result.expressions[lhs.operandIndex].intValue == 3);
+  CHECK(result.expressions[expr.rightIndex].intValue == 4);
+}
+
 TEST_CASE("SELECT WHERE integer equality") {
   auto result = parse("SELECT * FROM users WHERE id = 1;");
   CHECK(result.error.empty());

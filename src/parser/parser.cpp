@@ -275,7 +275,23 @@ int Parser::parseMultiplyDivide() {
   return left;
 }
 
-int Parser::parseUnary() { return this->parsePrimary(); }
+int Parser::parseUnary() {
+  if (this->current().type == TokenType::MINUS) {
+    this->advance();
+    int operandIndex = parsePrimary();
+    if (operandIndex == -1) {
+      return -1;
+    }
+    Expression expression;
+    expression.kind = ExpressionKind::UNARY;
+    expression.unaryOperator = UnaryOperator::NEGATE;
+    expression.operandIndex = operandIndex;
+    int index = this->result.expressions.size();
+    this->result.expressions.push_back(expression);
+    return index;
+  }
+  return this->parsePrimary();
+}
 
 int Parser::parsePrimary() {
   Expression expression;
