@@ -156,7 +156,7 @@ int Parser::parseAnd() {
 }
 
 int Parser::parseNot() {
-  if (this->current().type == TokenType::NOT) {
+  while (this->current().type == TokenType::NOT) {
     this->advance();
     int operandIndex = parseComparison();
     if (operandIndex == -1) {
@@ -354,6 +354,22 @@ int Parser::parsePrimary() {
     expression.boolValue = this->current().type == TokenType::TRUE;
     int index = static_cast<int>(this->result.expressions.size());
     this->result.expressions.push_back(expression);
+    this->advance();
+    return index;
+  }
+  case TokenType::LEFT_PAREN: {
+    this->advance();
+    int index = this->parseExpression();
+    if (index == -1) {
+      return -1;
+    }
+    if (this->current().type != TokenType::RIGHT_PAREN) {
+      this->result.error = "Syntax error at line " +
+                           std::to_string(this->current().line) +
+                           ": expected ')' but found '" +
+                           this->current().value + "'";
+      return -1;
+    }
     this->advance();
     return index;
   }

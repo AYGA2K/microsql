@@ -297,3 +297,140 @@ TEST_CASE("SELECT WHERE with incomplete expression") {
   auto result = parse("SELECT * FROM users WHERE id =;");
   CHECK_FALSE(result.error.empty());
 }
+
+TEST_CASE("SELECT float literal") {
+  auto result = parse("SELECT 3.14;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.selectColumns.size() == 1);
+  auto &expr = result.expressions[result.statement.selectColumns[0]];
+  CHECK(expr.kind == ExpressionKind::LITERAL_FLOAT);
+  CHECK(expr.floatValue == doctest::Approx(3.14));
+}
+
+TEST_CASE("SELECT NULL literal") {
+  auto result = parse("SELECT NULL;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.selectColumns.size() == 1);
+  auto &expr = result.expressions[result.statement.selectColumns[0]];
+  CHECK(expr.kind == ExpressionKind::LITERAL_NULL);
+}
+
+TEST_CASE("SELECT WHERE false literal") {
+  auto result = parse("SELECT * FROM users WHERE active = false;");
+  CHECK(result.error.empty());
+  CHECK(result.statement.whereIndex != -1);
+  auto &rhs = result.expressions[result.expressions[result.statement.whereIndex].rightIndex];
+  CHECK(rhs.kind == ExpressionKind::LITERAL_BOOL);
+  CHECK(rhs.boolValue == false);
+}
+
+TEST_CASE("SELECT arithmetic precedence multiply before add") {
+  auto result = parse("SELECT 2 + 3 * 4;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.selectColumns.size() == 1);
+  auto &expr = result.expressions[result.statement.selectColumns[0]];
+  REQUIRE(expr.kind == ExpressionKind::BINARY);
+  CHECK(expr.binaryOperator == BinaryOperator::ADD);
+  CHECK(result.expressions[expr.leftIndex].intValue == 2);
+  auto &rhs = result.expressions[expr.rightIndex];
+  REQUIRE(rhs.kind == ExpressionKind::BINARY);
+  CHECK(rhs.binaryOperator == BinaryOperator::MULTIPLY);
+  CHECK(result.expressions[rhs.leftIndex].intValue == 3);
+  CHECK(result.expressions[rhs.rightIndex].intValue == 4);
+}
+
+TEST_CASE("SELECT WHERE AND binds tighter than OR") {
+  auto result = parse("SELECT * FROM users WHERE a AND b OR c;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.whereIndex != -1);
+  auto &where = result.expressions[result.statement.whereIndex];
+  REQUIRE(where.kind == ExpressionKind::BINARY);
+  CHECK(where.binaryOperator == BinaryOperator::OR);
+  auto &lhs = result.expressions[where.leftIndex];
+  REQUIRE(lhs.kind == ExpressionKind::BINARY);
+  CHECK(lhs.binaryOperator == BinaryOperator::AND);
+  CHECK(result.expressions[lhs.leftIndex].columnName == "a");
+  CHECK(result.expressions[lhs.rightIndex].columnName == "b");
+  CHECK(result.expressions[where.rightIndex].columnName == "c");
+}
+
+TEST_CASE("SELECT WHERE arithmetic in condition") {
+  auto result = parse("SELECT * FROM users WHERE age + 1 > 18;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.whereIndex != -1);
+  auto &where = result.expressions[result.statement.whereIndex];
+  REQUIRE(where.kind == ExpressionKind::BINARY);
+  CHECK(where.binaryOperator == BinaryOperator::GREATER_THAN);
+  auto &lhs = result.expressions[where.leftIndex];
+  REQUIRE(lhs.kind == ExpressionKind::BINARY);
+  CHECK(lhs.binaryOperator == BinaryOperator::ADD);
+  CHECK(result.expressions[lhs.leftIndex].columnName == "age");
+  CHECK(result.expressions[lhs.rightIndex].intValue == 1);
+  CHECK(result.expressions[where.rightIndex].intValue == 18);
+}
+
+TEST_CASE("SELECT WHERE qualified column") {
+  auto result = parse("SELECT * FROM users WHERE users.id = 1;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.whereIndex != -1);
+  auto &where = result.expressions[result.statement.whereIndex];
+  auto &lhs = result.expressions[where.leftIndex];
+  CHECK(lhs.kind == ExpressionKind::COLUMN_REF);
+  CHECK(lhs.tablePrefix == "users");
+  CHECK(lhs.columnName == "id");
+}
+
+TEST_CASE("SELECT without semicolon") {
+  auto result = parse("SELECT * FROM users");
+  CHECK(result.error.empty());
+  CHECK(result.statement.kind == StatementKind::SELECT);
+  CHECK(result.statement.tableName == "users");
+}
+
+TEST_CASE("SELECT bad dot notation produces error") {
+  auto result = parse("SELECT users. FROM users;");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("SELECT parenthesized expression") {
+  auto result = parse("SELECT (1 + 2);");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.selectColumns.size() == 1);
+  auto &expr = result.expressions[result.statement.selectColumns[0]];
+  REQUIRE(expr.kind == ExpressionKind::BINARY);
+  CHECK(expr.binaryOperator == BinaryOperator::ADD);
+  CHECK(result.expressions[expr.leftIndex].intValue == 1);
+  CHECK(result.expressions[expr.rightIndex].intValue == 2);
+}
+
+TEST_CASE("SELECT parentheses override precedence") {
+  auto result = parse("SELECT (1 + 2) * 3;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.selectColumns.size() == 1);
+  auto &expr = result.expressions[result.statement.selectColumns[0]];
+  REQUIRE(expr.kind == ExpressionKind::BINARY);
+  CHECK(expr.binaryOperator == BinaryOperator::MULTIPLY);
+  auto &lhs = result.expressions[expr.leftIndex];
+  REQUIRE(lhs.kind == ExpressionKind::BINARY);
+  CHECK(lhs.binaryOperator == BinaryOperator::ADD);
+  CHECK(result.expressions[lhs.leftIndex].intValue == 1);
+  CHECK(result.expressions[lhs.rightIndex].intValue == 2);
+  CHECK(result.expressions[expr.rightIndex].intValue == 3);
+}
+
+TEST_CASE("SELECT WHERE parentheses override AND/OR precedence") {
+  auto result = parse("SELECT * FROM t WHERE (a = 1 OR b = 2) AND c = 3;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.whereIndex != -1);
+  auto &where = result.expressions[result.statement.whereIndex];
+  REQUIRE(where.kind == ExpressionKind::BINARY);
+  CHECK(where.binaryOperator == BinaryOperator::AND);
+  auto &lhs = result.expressions[where.leftIndex];
+  REQUIRE(lhs.kind == ExpressionKind::BINARY);
+  CHECK(lhs.binaryOperator == BinaryOperator::OR);
+}
+
+TEST_CASE("SELECT unclosed parenthesis produces error") {
+  auto result = parse("SELECT (1 + 2;");
+  CHECK_FALSE(result.error.empty());
+}
