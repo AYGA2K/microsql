@@ -434,3 +434,59 @@ TEST_CASE("SELECT unclosed parenthesis produces error") {
   auto result = parse("SELECT (1 + 2;");
   CHECK_FALSE(result.error.empty());
 }
+
+TEST_CASE("INSERT INTO table VALUES single integer") {
+  auto result = parse("INSERT INTO users VALUES (1);");
+  CHECK(result.error.empty());
+  CHECK(result.statement.kind == StatementKind::INSERT);
+  CHECK(result.statement.tableName == "users");
+  REQUIRE(result.statement.insertValues.size() == 1);
+  CHECK(result.expressions[result.statement.insertValues[0]].kind == ExpressionKind::LITERAL_INT);
+  CHECK(result.expressions[result.statement.insertValues[0]].intValue == 1);
+}
+
+TEST_CASE("INSERT INTO table VALUES multiple values") {
+  auto result = parse("INSERT INTO users VALUES (42, 'Alice', 3.14);");
+  CHECK(result.error.empty());
+  CHECK(result.statement.kind == StatementKind::INSERT);
+  CHECK(result.statement.tableName == "users");
+  REQUIRE(result.statement.insertValues.size() == 3);
+  CHECK(result.expressions[result.statement.insertValues[0]].intValue == 42);
+  CHECK(result.expressions[result.statement.insertValues[1]].textValue == "Alice");
+  CHECK(result.expressions[result.statement.insertValues[2]].kind == ExpressionKind::LITERAL_FLOAT);
+}
+
+TEST_CASE("INSERT INTO table with column list") {
+  auto result = parse("INSERT INTO users (id, name) VALUES (1, 'Bob');");
+  CHECK(result.error.empty());
+  CHECK(result.statement.kind == StatementKind::INSERT);
+  CHECK(result.statement.tableName == "users");
+  REQUIRE(result.statement.insertColumnNames.size() == 2);
+  CHECK(result.statement.insertColumnNames[0] == "id");
+  CHECK(result.statement.insertColumnNames[1] == "name");
+  REQUIRE(result.statement.insertValues.size() == 2);
+  CHECK(result.expressions[result.statement.insertValues[0]].intValue == 1);
+  CHECK(result.expressions[result.statement.insertValues[1]].textValue == "Bob");
+}
+
+TEST_CASE("INSERT INTO table VALUES NULL") {
+  auto result = parse("INSERT INTO users VALUES (NULL);");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.insertValues.size() == 1);
+  CHECK(result.expressions[result.statement.insertValues[0]].kind == ExpressionKind::LITERAL_NULL);
+}
+
+TEST_CASE("INSERT missing INTO produces error") {
+  auto result = parse("INSERT users VALUES (1);");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("INSERT missing table name produces error") {
+  auto result = parse("INSERT INTO VALUES (1);");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("INSERT missing VALUES keyword produces error") {
+  auto result = parse("INSERT INTO users (1);");
+  CHECK_FALSE(result.error.empty());
+}

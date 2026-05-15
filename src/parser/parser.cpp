@@ -32,9 +32,9 @@ ParseResult parse(const std::vector<Token> &tokens) {
   case TokenType::SELECT:
     parser.parseSelect();
     break;
-  // case TokenType::INSERT:
-  //   parser.parseInsert();
-  //   break;
+  case TokenType::INSERT:
+    parser.parseInsert();
+    break;
   // case TokenType::CREATE:
   //   parser.parseCreate();
   //   break;
@@ -66,8 +66,9 @@ void Parser::parseSelect() {
       return;
     }
   } else {
-    while ((this->current().type != TokenType::FROM) &&
-           (this->current().type != TokenType::SEMICOLON)) {
+    while (this->current().type != TokenType::FROM &&
+           this->current().type != TokenType::SEMICOLON &&
+           this->current().type != TokenType::END_OF_FILE) {
       int index = this->parseExpression();
       if (index == -1) {
         if (this->result.error.empty()) {
@@ -364,10 +365,9 @@ int Parser::parsePrimary() {
       return -1;
     }
     if (this->current().type != TokenType::RIGHT_PAREN) {
-      this->result.error = "Syntax error at line " +
-                           std::to_string(this->current().line) +
-                           ": expected ')' but found '" +
-                           this->current().value + "'";
+      this->result.error =
+          "Syntax error at line " + std::to_string(this->current().line) +
+          ": expected ')' but found '" + this->current().value + "'";
       return -1;
     }
     this->advance();
@@ -375,5 +375,87 @@ int Parser::parsePrimary() {
   }
   default:
     return -1;
+  }
+}
+
+void Parser::parseInsert() {
+  this->advance();
+  this->result.statement.kind = StatementKind::INSERT;
+  if (this->current().type != TokenType::INTO) {
+    this->result.error =
+        "Syntax error at line " + std::to_string(this->current().line) +
+        ": expected 'INTO' but found '" + this->current().value + "'";
+    return;
+  }
+  this->advance();
+  if (this->current().type != TokenType::IDENTIFIER) {
+    this->result.error =
+        "Syntax error at line " + std::to_string(this->current().line) +
+        ": expected tableName but found '" + this->current().value + "'";
+    return;
+  }
+  this->result.statement.tableName = this->current().value;
+  this->advance();
+  if (this->current().type == TokenType::LEFT_PAREN) {
+    this->advance();
+    this->result.statement.insertColumnNames.push_back(this->current().value);
+    this->advance();
+    while (this->current().type != TokenType::RIGHT_PAREN &&
+           this->current().type != TokenType::SEMICOLON &&
+           this->current().type != TokenType::END_OF_FILE) {
+      if (this->current().type == TokenType::COMMA) {
+        this->advance();
+      }
+      this->result.statement.insertColumnNames.push_back(this->current().value);
+      this->advance();
+      if (this->current().type == TokenType::COMMA) {
+        this->advance();
+      }
+    }
+    if (this->current().type != TokenType::RIGHT_PAREN) {
+      this->result.error =
+          "Syntax error at line " + std::to_string(this->current().line) +
+          ": expected ')' but found '" + this->current().value + "'";
+      return;
+    }
+    this->advance();
+  }
+  if (this->current().type != TokenType::VALUES) {
+    this->result.error =
+        "Syntax error at line " + std::to_string(this->current().line) +
+        ": expected 'VALUES' but found '" + this->current().value + "'";
+    return;
+  }
+  this->advance();
+  if (this->current().type == TokenType::LEFT_PAREN) {
+    this->advance();
+    this->result.statement.insertValues.push_back(parseExpression());
+    if (this->current().type == TokenType::COMMA) {
+      this->advance();
+      while (this->current().type != TokenType::RIGHT_PAREN &&
+             this->current().type != TokenType::SEMICOLON &&
+             this->current().type != TokenType::END_OF_FILE) {
+        if (this->current().type == TokenType::COMMA) {
+          this->advance();
+        }
+        this->result.statement.insertValues.push_back(parseExpression());
+        if (this->current().type == TokenType::COMMA) {
+          this->advance();
+        }
+      }
+    }
+    if (this->current().type != TokenType::RIGHT_PAREN) {
+      this->result.error =
+          "Syntax error at line " + std::to_string(this->current().line) +
+          ": expected ')' but found '" + this->current().value + "'";
+      return;
+    }
+    this->advance();
+    if (this->current().type != TokenType::SEMICOLON) {
+      this->result.error =
+          "Syntax error at line " + std::to_string(this->current().line) +
+          ": expected ';' but found '" + this->current().value + "'";
+      return;
+    }
   }
 }
