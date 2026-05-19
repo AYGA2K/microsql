@@ -119,7 +119,8 @@ TEST_CASE("SELECT negate integer literal") {
   auto &expr = result.expressions[result.statement.selectColumns[0]];
   REQUIRE(expr.kind == ExpressionKind::UNARY);
   CHECK(expr.unaryOperator == UnaryOperator::NEGATE);
-  CHECK(result.expressions[expr.operandIndex].kind == ExpressionKind::LITERAL_INT);
+  CHECK(result.expressions[expr.operandIndex].kind ==
+        ExpressionKind::LITERAL_INT);
   CHECK(result.expressions[expr.operandIndex].intValue == 5);
 }
 
@@ -130,7 +131,8 @@ TEST_CASE("SELECT negate column") {
   auto &expr = result.expressions[result.statement.selectColumns[0]];
   REQUIRE(expr.kind == ExpressionKind::UNARY);
   CHECK(expr.unaryOperator == UnaryOperator::NEGATE);
-  CHECK(result.expressions[expr.operandIndex].kind == ExpressionKind::COLUMN_REF);
+  CHECK(result.expressions[expr.operandIndex].kind ==
+        ExpressionKind::COLUMN_REF);
   CHECK(result.expressions[expr.operandIndex].columnName == "age");
 }
 
@@ -319,7 +321,8 @@ TEST_CASE("SELECT WHERE false literal") {
   auto result = parse("SELECT * FROM users WHERE active = false;");
   CHECK(result.error.empty());
   CHECK(result.statement.whereIndex != -1);
-  auto &rhs = result.expressions[result.expressions[result.statement.whereIndex].rightIndex];
+  auto &rhs = result.expressions[result.expressions[result.statement.whereIndex]
+                                     .rightIndex];
   CHECK(rhs.kind == ExpressionKind::LITERAL_BOOL);
   CHECK(rhs.boolValue == false);
 }
@@ -441,7 +444,8 @@ TEST_CASE("INSERT INTO table VALUES single integer") {
   CHECK(result.statement.kind == StatementKind::INSERT);
   CHECK(result.statement.tableName == "users");
   REQUIRE(result.statement.insertValues.size() == 1);
-  CHECK(result.expressions[result.statement.insertValues[0]].kind == ExpressionKind::LITERAL_INT);
+  CHECK(result.expressions[result.statement.insertValues[0]].kind ==
+        ExpressionKind::LITERAL_INT);
   CHECK(result.expressions[result.statement.insertValues[0]].intValue == 1);
 }
 
@@ -452,8 +456,10 @@ TEST_CASE("INSERT INTO table VALUES multiple values") {
   CHECK(result.statement.tableName == "users");
   REQUIRE(result.statement.insertValues.size() == 3);
   CHECK(result.expressions[result.statement.insertValues[0]].intValue == 42);
-  CHECK(result.expressions[result.statement.insertValues[1]].textValue == "Alice");
-  CHECK(result.expressions[result.statement.insertValues[2]].kind == ExpressionKind::LITERAL_FLOAT);
+  CHECK(result.expressions[result.statement.insertValues[1]].textValue ==
+        "Alice");
+  CHECK(result.expressions[result.statement.insertValues[2]].kind ==
+        ExpressionKind::LITERAL_FLOAT);
 }
 
 TEST_CASE("INSERT INTO table with column list") {
@@ -466,14 +472,16 @@ TEST_CASE("INSERT INTO table with column list") {
   CHECK(result.statement.insertColumnNames[1] == "name");
   REQUIRE(result.statement.insertValues.size() == 2);
   CHECK(result.expressions[result.statement.insertValues[0]].intValue == 1);
-  CHECK(result.expressions[result.statement.insertValues[1]].textValue == "Bob");
+  CHECK(result.expressions[result.statement.insertValues[1]].textValue ==
+        "Bob");
 }
 
 TEST_CASE("INSERT INTO table VALUES NULL") {
   auto result = parse("INSERT INTO users VALUES (NULL);");
   CHECK(result.error.empty());
   REQUIRE(result.statement.insertValues.size() == 1);
-  CHECK(result.expressions[result.statement.insertValues[0]].kind == ExpressionKind::LITERAL_NULL);
+  CHECK(result.expressions[result.statement.insertValues[0]].kind ==
+        ExpressionKind::LITERAL_NULL);
 }
 
 TEST_CASE("INSERT missing INTO produces error") {
@@ -488,5 +496,332 @@ TEST_CASE("INSERT missing table name produces error") {
 
 TEST_CASE("INSERT missing VALUES keyword produces error") {
   auto result = parse("INSERT INTO users (1);");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("DELETE FROM table no WHERE") {
+  auto result = parse("DELETE FROM users;");
+  CHECK(result.error.empty());
+  CHECK(result.statement.kind == StatementKind::DELETE);
+  CHECK(result.statement.tableName == "users");
+  CHECK(result.statement.whereIndex == -1);
+}
+
+TEST_CASE("DELETE missing semicolon produces error") {
+  auto result = parse("DELETE FROM users");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("DELETE FROM table WHERE integer equality") {
+  auto result = parse("DELETE FROM users WHERE id = 1;");
+  CHECK(result.error.empty());
+  CHECK(result.statement.kind == StatementKind::DELETE);
+  CHECK(result.statement.tableName == "users");
+  REQUIRE(result.statement.whereIndex != -1);
+  auto &where = result.expressions[result.statement.whereIndex];
+  CHECK(where.kind == ExpressionKind::BINARY);
+  CHECK(where.binaryOperator == BinaryOperator::EQUAL);
+  CHECK(result.expressions[where.leftIndex].columnName == "id");
+  CHECK(result.expressions[where.rightIndex].intValue == 1);
+}
+
+TEST_CASE("DELETE FROM table WHERE string equality") {
+  auto result = parse("DELETE FROM users WHERE name = 'Alice';");
+  CHECK(result.error.empty());
+  CHECK(result.statement.kind == StatementKind::DELETE);
+  REQUIRE(result.statement.whereIndex != -1);
+  auto &where = result.expressions[result.statement.whereIndex];
+  CHECK(where.binaryOperator == BinaryOperator::EQUAL);
+  auto &rhs = result.expressions[where.rightIndex];
+  CHECK(rhs.kind == ExpressionKind::LITERAL_TEXT);
+  CHECK(rhs.textValue == "Alice");
+}
+
+TEST_CASE("DELETE FROM table WHERE greater-than") {
+  auto result = parse("DELETE FROM logs WHERE age > 30;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.whereIndex != -1);
+  CHECK(result.expressions[result.statement.whereIndex].binaryOperator ==
+        BinaryOperator::GREATER_THAN);
+}
+
+TEST_CASE("DELETE FROM table WHERE less-than") {
+  auto result = parse("DELETE FROM logs WHERE score < 10;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.whereIndex != -1);
+  CHECK(result.expressions[result.statement.whereIndex].binaryOperator ==
+        BinaryOperator::LESS_THAN);
+}
+
+TEST_CASE("DELETE FROM table WHERE boolean literal") {
+  auto result = parse("DELETE FROM users WHERE active = false;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.whereIndex != -1);
+  auto &rhs = result.expressions[result.expressions[result.statement.whereIndex]
+                                     .rightIndex];
+  CHECK(rhs.kind == ExpressionKind::LITERAL_BOOL);
+  CHECK(rhs.boolValue == false);
+}
+
+TEST_CASE("DELETE FROM table WHERE IS NULL") {
+  auto result = parse("DELETE FROM users WHERE deleted_at IS NULL;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.whereIndex != -1);
+  auto &where = result.expressions[result.statement.whereIndex];
+  CHECK(where.binaryOperator == BinaryOperator::IS);
+  CHECK(result.expressions[where.leftIndex].columnName == "deleted_at");
+  CHECK(result.expressions[where.rightIndex].kind ==
+        ExpressionKind::LITERAL_NULL);
+}
+
+TEST_CASE("DELETE FROM table WHERE IS NOT NULL") {
+  auto result = parse("DELETE FROM users WHERE email IS NOT NULL;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.whereIndex != -1);
+  auto &where = result.expressions[result.statement.whereIndex];
+  CHECK(where.binaryOperator == BinaryOperator::IS_NOT);
+  CHECK(result.expressions[where.leftIndex].columnName == "email");
+  CHECK(result.expressions[where.rightIndex].kind ==
+        ExpressionKind::LITERAL_NULL);
+}
+
+TEST_CASE("DELETE FROM table WHERE AND") {
+  auto result = parse("DELETE FROM users WHERE age > 18 AND active = true;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.whereIndex != -1);
+  auto &where = result.expressions[result.statement.whereIndex];
+  CHECK(where.kind == ExpressionKind::BINARY);
+  CHECK(where.binaryOperator == BinaryOperator::AND);
+}
+
+TEST_CASE("DELETE FROM table WHERE OR") {
+  auto result =
+      parse("DELETE FROM users WHERE role = 'guest' OR role = 'banned';");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.whereIndex != -1);
+  CHECK(result.expressions[result.statement.whereIndex].binaryOperator ==
+        BinaryOperator::OR);
+}
+
+TEST_CASE("DELETE FROM table WHERE NOT") {
+  auto result = parse("DELETE FROM users WHERE NOT active;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.whereIndex != -1);
+  auto &where = result.expressions[result.statement.whereIndex];
+  CHECK(where.kind == ExpressionKind::UNARY);
+  CHECK(where.unaryOperator == UnaryOperator::NOT);
+}
+
+TEST_CASE("DELETE missing FROM produces error") {
+  auto result = parse("DELETE users;");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("DELETE missing table name after FROM produces error") {
+  auto result = parse("DELETE FROM;");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("DELETE missing table name before WHERE produces error") {
+  auto result = parse("DELETE FROM WHERE id = 1;");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("DELETE incomplete WHERE clause produces error") {
+  auto result = parse("DELETE FROM users WHERE;");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("DELETE WHERE with incomplete expression produces error") {
+  auto result = parse("DELETE FROM users WHERE id =;");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("UPDATE single integer assignment") {
+  auto result = parse("UPDATE users SET age = 30;");
+  CHECK(result.error.empty());
+  CHECK(result.statement.kind == StatementKind::UPDATE);
+  CHECK(result.statement.tableName == "users");
+  REQUIRE(result.statement.assignments.size() == 1);
+  CHECK(result.statement.assignments[0].first == "age");
+  auto &val = result.expressions[result.statement.assignments[0].second];
+  CHECK(val.kind == ExpressionKind::LITERAL_INT);
+  CHECK(val.intValue == 30);
+  CHECK(result.statement.whereIndex == -1);
+}
+
+TEST_CASE("UPDATE single string assignment") {
+  auto result = parse("UPDATE users SET name = 'Alice';");
+  CHECK(result.error.empty());
+  CHECK(result.statement.kind == StatementKind::UPDATE);
+  CHECK(result.statement.tableName == "users");
+  REQUIRE(result.statement.assignments.size() == 1);
+  CHECK(result.statement.assignments[0].first == "name");
+  auto &val = result.expressions[result.statement.assignments[0].second];
+  CHECK(val.kind == ExpressionKind::LITERAL_TEXT);
+  CHECK(val.textValue == "Alice");
+}
+
+TEST_CASE("UPDATE single NULL assignment") {
+  auto result = parse("UPDATE users SET deleted_at = NULL;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.assignments.size() == 1);
+  CHECK(result.statement.assignments[0].first == "deleted_at");
+  auto &val = result.expressions[result.statement.assignments[0].second];
+  CHECK(val.kind == ExpressionKind::LITERAL_NULL);
+}
+
+TEST_CASE("UPDATE single boolean assignment") {
+  auto result = parse("UPDATE users SET active = true;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.assignments.size() == 1);
+  CHECK(result.statement.assignments[0].first == "active");
+  auto &val = result.expressions[result.statement.assignments[0].second];
+  CHECK(val.kind == ExpressionKind::LITERAL_BOOL);
+  CHECK(val.boolValue == true);
+}
+
+TEST_CASE("UPDATE assignment with arithmetic expression") {
+  auto result = parse("UPDATE products SET price = price + 10;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.assignments.size() == 1);
+  CHECK(result.statement.assignments[0].first == "price");
+  auto &val = result.expressions[result.statement.assignments[0].second];
+  REQUIRE(val.kind == ExpressionKind::BINARY);
+  CHECK(val.binaryOperator == BinaryOperator::ADD);
+  CHECK(result.expressions[val.leftIndex].columnName == "price");
+  CHECK(result.expressions[val.rightIndex].intValue == 10);
+}
+
+TEST_CASE("UPDATE multiple assignments") {
+  auto result = parse("UPDATE users SET name = 'Bob', age = 25;");
+  CHECK(result.error.empty());
+  CHECK(result.statement.kind == StatementKind::UPDATE);
+  CHECK(result.statement.tableName == "users");
+  REQUIRE(result.statement.assignments.size() == 2);
+  CHECK(result.statement.assignments[0].first == "name");
+  CHECK(result.expressions[result.statement.assignments[0].second].textValue ==
+        "Bob");
+  CHECK(result.statement.assignments[1].first == "age");
+  CHECK(result.expressions[result.statement.assignments[1].second].intValue ==
+        25);
+}
+
+TEST_CASE("UPDATE three assignments") {
+  auto result =
+      parse("UPDATE users SET name = 'Carol', age = 40, active = false;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.assignments.size() == 3);
+  CHECK(result.statement.assignments[0].first == "name");
+  CHECK(result.statement.assignments[1].first == "age");
+  CHECK(result.statement.assignments[2].first == "active");
+  CHECK(result.expressions[result.statement.assignments[2].second].boolValue ==
+        false);
+}
+
+TEST_CASE("UPDATE with WHERE integer equality") {
+  auto result = parse("UPDATE users SET age = 30 WHERE id = 1;");
+  CHECK(result.error.empty());
+  CHECK(result.statement.kind == StatementKind::UPDATE);
+  REQUIRE(result.statement.assignments.size() == 1);
+  CHECK(result.statement.assignments[0].first == "age");
+  REQUIRE(result.statement.whereIndex != -1);
+  auto &where = result.expressions[result.statement.whereIndex];
+  CHECK(where.kind == ExpressionKind::BINARY);
+  CHECK(where.binaryOperator == BinaryOperator::EQUAL);
+  CHECK(result.expressions[where.leftIndex].columnName == "id");
+  CHECK(result.expressions[where.rightIndex].intValue == 1);
+}
+
+TEST_CASE("UPDATE with WHERE string equality") {
+  auto result = parse("UPDATE users SET active = false WHERE name = 'Alice';");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.whereIndex != -1);
+  auto &where = result.expressions[result.statement.whereIndex];
+  CHECK(where.binaryOperator == BinaryOperator::EQUAL);
+  CHECK(result.expressions[where.rightIndex].textValue == "Alice");
+}
+
+TEST_CASE("UPDATE multiple assignments with WHERE") {
+  auto result = parse("UPDATE users SET name = 'Dave', age = 22 WHERE id = 5;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.assignments.size() == 2);
+  CHECK(result.statement.assignments[0].first == "name");
+  CHECK(result.statement.assignments[1].first == "age");
+  REQUIRE(result.statement.whereIndex != -1);
+  CHECK(result.expressions[result.statement.whereIndex].binaryOperator ==
+        BinaryOperator::EQUAL);
+}
+
+TEST_CASE("UPDATE with WHERE AND") {
+  auto result = parse(
+      "UPDATE users SET active = false WHERE age < 18 AND role = 'guest';");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.whereIndex != -1);
+  auto &where = result.expressions[result.statement.whereIndex];
+  CHECK(where.kind == ExpressionKind::BINARY);
+  CHECK(where.binaryOperator == BinaryOperator::AND);
+}
+
+TEST_CASE("UPDATE with WHERE OR") {
+  auto result = parse("UPDATE users SET active = false WHERE role = 'guest' OR "
+                      "role = 'banned';");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.whereIndex != -1);
+  CHECK(result.expressions[result.statement.whereIndex].binaryOperator ==
+        BinaryOperator::OR);
+}
+
+TEST_CASE("UPDATE with WHERE IS NULL") {
+  auto result =
+      parse("UPDATE users SET active = false WHERE deleted_at IS NULL;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.whereIndex != -1);
+  auto &where = result.expressions[result.statement.whereIndex];
+  CHECK(where.binaryOperator == BinaryOperator::IS);
+  CHECK(result.expressions[where.leftIndex].columnName == "deleted_at");
+  CHECK(result.expressions[where.rightIndex].kind ==
+        ExpressionKind::LITERAL_NULL);
+}
+
+TEST_CASE("UPDATE with WHERE IS NOT NULL") {
+  auto result =
+      parse("UPDATE users SET active = true WHERE email IS NOT NULL;");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.whereIndex != -1);
+  auto &where = result.expressions[result.statement.whereIndex];
+  CHECK(where.binaryOperator == BinaryOperator::IS_NOT);
+  CHECK(result.expressions[where.leftIndex].columnName == "email");
+  CHECK(result.expressions[where.rightIndex].kind ==
+        ExpressionKind::LITERAL_NULL);
+}
+
+TEST_CASE("UPDATE missing table name produces error") {
+  auto result = parse("UPDATE SET age = 1;");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("UPDATE missing SET keyword produces error") {
+  auto result = parse("UPDATE users age = 1;");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("UPDATE missing equals in assignment produces error") {
+  auto result = parse("UPDATE users SET age 30;");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("UPDATE missing value in assignment produces error") {
+  auto result = parse("UPDATE users SET age =;");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("UPDATE incomplete WHERE clause produces error") {
+  auto result = parse("UPDATE users SET age = 1 WHERE;");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("UPDATE WHERE with incomplete expression produces error") {
+  auto result = parse("UPDATE users SET age = 1 WHERE id =;");
   CHECK_FALSE(result.error.empty());
 }

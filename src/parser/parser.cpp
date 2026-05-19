@@ -38,12 +38,12 @@ ParseResult parse(const std::vector<Token> &tokens) {
   // case TokenType::CREATE:
   //   parser.parseCreate();
   //   break;
-  // case TokenType::UPDATE:
-  //   parser.parseUpdate();
-  //   break;
-  // case TokenType::DELETE:
-  //   parser.parseDelete();
-  //   break;
+  case TokenType::UPDATE:
+    parser.parseUpdate();
+    break;
+  case TokenType::DELETE:
+    parser.parseDelete();
+    break;
   default:
     parser.result.error = "Syntax error at line " + std::to_string(token.line) +
                           ": unexpected token '" + token.value + "'";
@@ -189,6 +189,8 @@ int Parser::parseComparison() {
 
     Expression expression;
     expression.kind = ExpressionKind::BINARY;
+    std::string operatorValue = this->current().value;
+    int operatorLine = this->current().line;
     if (this->current().type == TokenType::EQUAL) {
       expression.binaryOperator = BinaryOperator::EQUAL;
     } else if (this->current().type == TokenType::NOT_EQUAL) {
@@ -204,6 +206,7 @@ int Parser::parseComparison() {
     } else if (this->current().type == TokenType::IS) {
       if (this->peek().type == TokenType::NOT) {
         expression.binaryOperator = BinaryOperator::IS_NOT;
+        operatorValue = "IS NOT";
         this->advance();
       } else {
         expression.binaryOperator = BinaryOperator::IS;
@@ -212,6 +215,11 @@ int Parser::parseComparison() {
     this->advance();
     int right = parseAddSubstract();
     if (right == -1) {
+      if (this->result.error.empty()) {
+        this->result.error =
+            "Syntax error at line " + std::to_string(operatorLine) +
+            ": expected expression after '" + operatorValue + "'";
+      }
       return -1;
     }
     expression.leftIndex = left;
@@ -457,5 +465,133 @@ void Parser::parseInsert() {
           ": expected ';' but found '" + this->current().value + "'";
       return;
     }
+  }
+}
+
+void Parser::parseDelete() {
+  this->advance();
+  this->result.statement.kind = StatementKind::DELETE;
+  if (this->current().type != TokenType::FROM) {
+    this->result.error =
+        "Syntax error at line " + std::to_string(this->current().line) +
+        ": expected 'FROM' but found '" + this->current().value + "'";
+    return;
+  }
+  this->advance();
+  if (this->current().type != TokenType::IDENTIFIER) {
+    this->result.error =
+        "Syntax error at line " + std::to_string(this->current().line) +
+        ": expected table name but found '" + this->current().value + "'";
+    return;
+  }
+  this->result.statement.tableName = this->current().value;
+  this->advance();
+
+  if (this->current().type == TokenType::WHERE) {
+    this->advance();
+    int index = this->parseExpression();
+    if (index == -1) {
+      if (this->result.error.empty()) {
+        this->result.error = "Syntax error at line " +
+                             std::to_string(this->current().line) +
+                             ": expected expression after WHERE";
+      }
+      return;
+    }
+    this->result.statement.whereIndex = index;
+  } else {
+    this->result.statement.whereIndex = -1;
+  }
+
+  if (this->current().type != TokenType::SEMICOLON) {
+    this->result.error =
+        "Syntax error at line " + std::to_string(this->current().line) +
+        ": expected ';' but found '" + this->current().value + "'";
+    return;
+  }
+}
+
+void Parser::parseUpdate() {
+  this->advance();
+  this->result.statement.kind = StatementKind::UPDATE;
+  if (this->current().type != TokenType::IDENTIFIER) {
+    this->result.error =
+        "Syntax error at line " + std::to_string(this->current().line) +
+        ": expected table name but found '" + this->current().value + "'";
+    return;
+  }
+  this->result.statement.tableName = this->current().value;
+  this->advance();
+  if (this->current().type != TokenType::SET) {
+    this->result.error =
+        "Syntax error at line " + std::to_string(this->current().line) +
+        ": expected 'SET' but found '" + this->current().value + "'";
+    return;
+  }
+  this->advance();
+  if (this->current().type != TokenType::IDENTIFIER) {
+    this->result.error =
+        "Syntax error at line " + std::to_string(this->current().line) +
+        ": expected column name but found '" + this->current().value + "'";
+    return;
+  }
+  const std::string colName = this->current().value;
+  this->advance();
+  if (this->current().type != TokenType::EQUAL) {
+    this->result.error =
+        "Syntax error at line " + std::to_string(this->current().line) +
+        ": expected '=' but found '" + this->current().value + "'";
+    return;
+  }
+  this->advance();
+  const int index = parseExpression();
+  if (index == -1) {
+    return;
+  }
+  this->result.statement.assignments.push_back({colName, index});
+  while (this->current().type == TokenType::COMMA) {
+    this->advance();
+    if (this->current().type != TokenType::IDENTIFIER) {
+      this->result.error =
+          "Syntax error at line " + std::to_string(this->current().line) +
+          ": expected column name but found '" + this->current().value + "'";
+      return;
+    }
+    const std::string colName = this->current().value;
+    this->advance();
+    if (this->current().type != TokenType::EQUAL) {
+      this->result.error =
+          "Syntax error at line " + std::to_string(this->current().line) +
+          ": expected '=' but found '" + this->current().value + "'";
+      return;
+    }
+    this->advance();
+    const int index = parseExpression();
+    if (index == -1) {
+      return;
+    }
+    this->result.statement.assignments.push_back({colName, index});
+  }
+
+  if (this->current().type == TokenType::WHERE) {
+    this->advance();
+    int index = this->parseExpression();
+    if (index == -1) {
+      if (this->result.error.empty()) {
+        this->result.error = "Syntax error at line " +
+                             std::to_string(this->current().line) +
+                             ": expected expression after WHERE";
+      }
+      return;
+    }
+    this->result.statement.whereIndex = index;
+  } else {
+    this->result.statement.whereIndex = -1;
+  }
+  if (this->current().type != TokenType::SEMICOLON) {
+    this->result.error =
+        "Syntax error at line " + std::to_string(this->current().line) +
+        ": expected ';' but found '" + this->current().value + "'";
+    return;
   }
 }
