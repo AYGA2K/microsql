@@ -27,6 +27,11 @@ struct Parser {
   void parseCreateIndex();
   void parseDrop();
 
+  bool consume(TokenType type, const std::string &name);
+  bool consumeIdentifier(std::string &out, const std::string &context);
+  int requireExpression(const std::string &context);
+  bool parseAssignment();
+
   int parseExpression();
   int parseAnd();
   int parseNot();
