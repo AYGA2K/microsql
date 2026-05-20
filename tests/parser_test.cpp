@@ -825,3 +825,132 @@ TEST_CASE("UPDATE WHERE with incomplete expression produces error") {
   auto result = parse("UPDATE users SET age = 1 WHERE id =;");
   CHECK_FALSE(result.error.empty());
 }
+
+TEST_CASE("CREATE TABLE single INTEGER column") {
+  auto result = parse("CREATE TABLE users (id INTEGER);");
+  CHECK(result.error.empty());
+  CHECK(result.statement.kind == StatementKind::CREATE_TABLE);
+  CHECK(result.statement.tableName == "users");
+  REQUIRE(result.statement.columnDefinitions.size() == 1);
+  CHECK(result.statement.columnDefinitions[0].name == "id");
+  CHECK(result.statement.columnDefinitions[0].type == DataType::INTEGER);
+  CHECK(result.statement.columnDefinitions[0].notNull == false);
+  CHECK(result.statement.columnDefinitions[0].primaryKey == false);
+}
+
+TEST_CASE("CREATE TABLE single FLOAT column") {
+  auto result = parse("CREATE TABLE products (price FLOAT);");
+  CHECK(result.error.empty());
+  CHECK(result.statement.kind == StatementKind::CREATE_TABLE);
+  REQUIRE(result.statement.columnDefinitions.size() == 1);
+  CHECK(result.statement.columnDefinitions[0].name == "price");
+  CHECK(result.statement.columnDefinitions[0].type == DataType::FLOAT);
+}
+
+TEST_CASE("CREATE TABLE single TEXT column") {
+  auto result = parse("CREATE TABLE users (name TEXT);");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.columnDefinitions.size() == 1);
+  CHECK(result.statement.columnDefinitions[0].name == "name");
+  CHECK(result.statement.columnDefinitions[0].type == DataType::TEXT);
+  CHECK(result.statement.columnDefinitions[0].textLength == 0);
+}
+
+TEST_CASE("CREATE TABLE TEXT column with length") {
+  auto result = parse("CREATE TABLE users (name TEXT(100));");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.columnDefinitions.size() == 1);
+  CHECK(result.statement.columnDefinitions[0].name == "name");
+  CHECK(result.statement.columnDefinitions[0].type == DataType::TEXT);
+  CHECK(result.statement.columnDefinitions[0].textLength == 100);
+}
+
+TEST_CASE("CREATE TABLE single BOOLEAN column") {
+  auto result = parse("CREATE TABLE users (active BOOLEAN);");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.columnDefinitions.size() == 1);
+  CHECK(result.statement.columnDefinitions[0].name == "active");
+  CHECK(result.statement.columnDefinitions[0].type == DataType::BOOLEAN);
+}
+
+TEST_CASE("CREATE TABLE column with NOT NULL") {
+  auto result = parse("CREATE TABLE users (id INTEGER NOT NULL);");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.columnDefinitions.size() == 1);
+  CHECK(result.statement.columnDefinitions[0].name == "id");
+  CHECK(result.statement.columnDefinitions[0].type == DataType::INTEGER);
+  CHECK(result.statement.columnDefinitions[0].notNull == true);
+}
+
+TEST_CASE("CREATE TABLE column with PRIMARY KEY") {
+  auto result = parse("CREATE TABLE users (id INTEGER PRIMARY KEY);");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.columnDefinitions.size() == 1);
+  CHECK(result.statement.columnDefinitions[0].name == "id");
+  CHECK(result.statement.columnDefinitions[0].primaryKey == true);
+}
+
+TEST_CASE("CREATE TABLE column with NOT NULL and PRIMARY KEY") {
+  auto result = parse("CREATE TABLE users (id INTEGER NOT NULL PRIMARY KEY);");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.columnDefinitions.size() == 1);
+  CHECK(result.statement.columnDefinitions[0].notNull == true);
+  CHECK(result.statement.columnDefinitions[0].primaryKey == true);
+}
+
+TEST_CASE("CREATE TABLE multiple columns") {
+  auto result = parse("CREATE TABLE users (id INTEGER, name TEXT, age INTEGER);");
+  CHECK(result.error.empty());
+  CHECK(result.statement.kind == StatementKind::CREATE_TABLE);
+  CHECK(result.statement.tableName == "users");
+  REQUIRE(result.statement.columnDefinitions.size() == 3);
+  CHECK(result.statement.columnDefinitions[0].name == "id");
+  CHECK(result.statement.columnDefinitions[0].type == DataType::INTEGER);
+  CHECK(result.statement.columnDefinitions[1].name == "name");
+  CHECK(result.statement.columnDefinitions[1].type == DataType::TEXT);
+  CHECK(result.statement.columnDefinitions[2].name == "age");
+  CHECK(result.statement.columnDefinitions[2].type == DataType::INTEGER);
+}
+
+TEST_CASE("CREATE TABLE multiple columns with constraints") {
+  auto result = parse(
+      "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL, active BOOLEAN);");
+  CHECK(result.error.empty());
+  REQUIRE(result.statement.columnDefinitions.size() == 3);
+  CHECK(result.statement.columnDefinitions[0].primaryKey == true);
+  CHECK(result.statement.columnDefinitions[0].notNull == false);
+  CHECK(result.statement.columnDefinitions[1].notNull == true);
+  CHECK(result.statement.columnDefinitions[1].primaryKey == false);
+  CHECK(result.statement.columnDefinitions[2].notNull == false);
+  CHECK(result.statement.columnDefinitions[2].primaryKey == false);
+}
+
+TEST_CASE("CREATE TABLE missing TABLE keyword produces error") {
+  auto result = parse("CREATE users (id INTEGER);");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("CREATE TABLE missing table name produces error") {
+  auto result = parse("CREATE TABLE (id INTEGER);");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("CREATE TABLE missing left paren produces error") {
+  auto result = parse("CREATE TABLE users id INTEGER);");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("CREATE TABLE missing right paren produces error") {
+  auto result = parse("CREATE TABLE users (id INTEGER;");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("CREATE TABLE missing column type produces error") {
+  auto result = parse("CREATE TABLE users (id);");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("CREATE TABLE missing semicolon produces error") {
+  auto result = parse("CREATE TABLE users (id INTEGER)");
+  CHECK_FALSE(result.error.empty());
+}

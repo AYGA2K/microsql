@@ -20,8 +20,8 @@ struct ColumnDefinition {
   std::string name;
   DataType type;
   int textLength; // for TEXT(n); 0 otherwise
-  bool notNull;
-  bool primaryKey;
+  bool notNull = false;
+  bool primaryKey = false;
 };
 
 struct Statement {

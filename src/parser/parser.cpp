@@ -22,8 +22,12 @@ const Token &Parser::peek() {
 
 void Parser::advance() { this->position++; }
 
+bool Parser::currentIs(TokenType type) { return this->current().type == type; }
+
+bool Parser::peekIs(TokenType type) { return this->peek().type == type; }
+
 bool Parser::consume(TokenType type, const std::string &name) {
-  if (this->current().type != type) {
+  if (!this->currentIs(type)) {
     this->result.error = "Syntax error at line " +
                          std::to_string(this->current().line) + ": expected '" +
                          name + "' but found '" + this->current().value + "'";
@@ -34,7 +38,7 @@ bool Parser::consume(TokenType type, const std::string &name) {
 }
 
 bool Parser::consumeIdentifier(std::string &out, const std::string &context) {
-  if (this->current().type != TokenType::IDENTIFIER) {
+  if (!this->currentIs(TokenType::IDENTIFIER)) {
     this->result.error = "Syntax error at line " +
                          std::to_string(this->current().line) + ": expected " +
                          context + " but found '" + this->current().value + "'";
@@ -80,9 +84,9 @@ ParseResult parse(const std::vector<Token> &tokens) {
   case TokenType::INSERT:
     parser.parseInsert();
     break;
-  // case TokenType::CREATE:
-  //   parser.parseCreate();
-  //   break;
+  case TokenType::CREATE:
+    parser.parseCreate();
+    break;
   case TokenType::UPDATE:
     parser.parseUpdate();
     break;
@@ -100,20 +104,20 @@ ParseResult parse(const std::vector<Token> &tokens) {
 void Parser::parseSelect() {
   this->advance();
   this->result.statement.kind = StatementKind::SELECT;
-  if (this->current().type == TokenType::STAR) {
+  if (this->currentIs(TokenType::STAR)) {
     this->advance();
-    if (this->current().type != TokenType::FROM &&
-        this->current().type != TokenType::SEMICOLON &&
-        this->current().type != TokenType::END_OF_FILE) {
+    if (!this->currentIs(TokenType::FROM) &&
+        !this->currentIs(TokenType::SEMICOLON) &&
+        !this->currentIs(TokenType::END_OF_FILE)) {
       this->result.error = "Syntax error at line " +
                            std::to_string(this->current().line) +
                            ": unexpected token '" + this->current().value + "'";
       return;
     }
   } else {
-    while (this->current().type != TokenType::FROM &&
-           this->current().type != TokenType::SEMICOLON &&
-           this->current().type != TokenType::END_OF_FILE) {
+    while (!this->currentIs(TokenType::FROM) &&
+           !this->currentIs(TokenType::SEMICOLON) &&
+           !this->currentIs(TokenType::END_OF_FILE)) {
       int index = this->parseExpression();
       if (index == -1) {
         if (this->result.error.empty()) {
@@ -123,17 +127,17 @@ void Parser::parseSelect() {
         return;
       }
       this->result.statement.selectColumns.push_back(index);
-      if (this->current().type == TokenType::COMMA) {
+      if (this->currentIs(TokenType::COMMA)) {
         this->advance();
       }
     }
   }
-  if (this->current().type == TokenType::FROM) {
+  if (this->currentIs(TokenType::FROM)) {
     this->advance();
     if (!this->consumeIdentifier(this->result.statement.tableName,
                                  "table name after FROM"))
       return;
-    if (this->current().type == TokenType::WHERE) {
+    if (this->currentIs(TokenType::WHERE)) {
       this->advance();
       int index = this->requireExpression("expected expression after WHERE");
       if (index == -1)
@@ -152,7 +156,7 @@ int Parser::parseExpression() {
   if (left == -1) {
     return -1;
   }
-  while (this->current().type == TokenType::OR) {
+  while (this->currentIs(TokenType::OR)) {
     this->advance();
     int right = this->parseAnd();
     if (right == -1) {
@@ -174,7 +178,7 @@ int Parser::parseAnd() {
   if (left == -1) {
     return -1;
   }
-  while (this->current().type == TokenType::AND) {
+  while (this->currentIs(TokenType::AND)) {
     this->advance();
     int right = this->parseNot();
     if (right == -1) {
@@ -192,7 +196,7 @@ int Parser::parseAnd() {
 }
 
 int Parser::parseNot() {
-  while (this->current().type == TokenType::NOT) {
+  while (this->currentIs(TokenType::NOT)) {
     this->advance();
     int operandIndex = parseComparison();
     if (operandIndex == -1) {
@@ -214,32 +218,32 @@ int Parser::parseComparison() {
   if (left == -1) {
     return -1;
   }
-  while (this->current().type == TokenType::EQUAL ||
-         this->current().type == TokenType::NOT_EQUAL ||
-         this->current().type == TokenType::LESS_THAN ||
-         this->current().type == TokenType::LESS_EQ ||
-         this->current().type == TokenType::GREATER_THAN ||
-         this->current().type == TokenType::GREATER_EQ ||
-         this->current().type == TokenType::IS) {
+  while (this->currentIs(TokenType::EQUAL) ||
+         this->currentIs(TokenType::NOT_EQUAL) ||
+         this->currentIs(TokenType::LESS_THAN) ||
+         this->currentIs(TokenType::LESS_EQ) ||
+         this->currentIs(TokenType::GREATER_THAN) ||
+         this->currentIs(TokenType::GREATER_EQ) ||
+         this->currentIs(TokenType::IS)) {
 
     Expression expression;
     expression.kind = ExpressionKind::BINARY;
     std::string operatorValue = this->current().value;
     int operatorLine = this->current().line;
-    if (this->current().type == TokenType::EQUAL) {
+    if (this->currentIs(TokenType::EQUAL)) {
       expression.binaryOperator = BinaryOperator::EQUAL;
-    } else if (this->current().type == TokenType::NOT_EQUAL) {
+    } else if (this->currentIs(TokenType::NOT_EQUAL)) {
       expression.binaryOperator = BinaryOperator::NOT_EQUAL;
-    } else if (this->current().type == TokenType::LESS_THAN) {
+    } else if (this->currentIs(TokenType::LESS_THAN)) {
       expression.binaryOperator = BinaryOperator::LESS_THAN;
-    } else if (this->current().type == TokenType::LESS_EQ) {
+    } else if (this->currentIs(TokenType::LESS_EQ)) {
       expression.binaryOperator = BinaryOperator::LESS_THAN_OR_EQUAL;
-    } else if (this->current().type == TokenType::GREATER_THAN) {
+    } else if (this->currentIs(TokenType::GREATER_THAN)) {
       expression.binaryOperator = BinaryOperator::GREATER_THAN;
-    } else if (this->current().type == TokenType::GREATER_EQ) {
+    } else if (this->currentIs(TokenType::GREATER_EQ)) {
       expression.binaryOperator = BinaryOperator::GREATER_THAN_OR_EQUAL;
-    } else if (this->current().type == TokenType::IS) {
-      if (this->peek().type == TokenType::NOT) {
+    } else if (this->currentIs(TokenType::IS)) {
+      if (this->peekIs(TokenType::NOT)) {
         expression.binaryOperator = BinaryOperator::IS_NOT;
         operatorValue = "IS NOT";
         this->advance();
@@ -270,13 +274,13 @@ int Parser::parseAddSubstract() {
   if (left == -1) {
     return -1;
   }
-  while (this->current().type == TokenType::PLUS ||
-         this->current().type == TokenType::MINUS) {
+  while (this->currentIs(TokenType::PLUS) ||
+         this->currentIs(TokenType::MINUS)) {
     Expression expression;
     expression.kind = ExpressionKind::BINARY;
-    if (this->current().type == TokenType::PLUS) {
+    if (this->currentIs(TokenType::PLUS)) {
       expression.binaryOperator = BinaryOperator::ADD;
-    } else if (this->current().type == TokenType::MINUS) {
+    } else if (this->currentIs(TokenType::MINUS)) {
       expression.binaryOperator = BinaryOperator::SUBTRACT;
     }
     this->advance();
@@ -297,13 +301,13 @@ int Parser::parseMultiplyDivide() {
   if (left == -1) {
     return -1;
   }
-  while (this->current().type == TokenType::STAR ||
-         this->current().type == TokenType::SLASH) {
+  while (this->currentIs(TokenType::STAR) ||
+         this->currentIs(TokenType::SLASH)) {
     Expression expression;
     expression.kind = ExpressionKind::BINARY;
-    if (this->current().type == TokenType::STAR) {
+    if (this->currentIs(TokenType::STAR)) {
       expression.binaryOperator = BinaryOperator::MULTIPLY;
-    } else if (this->current().type == TokenType::SLASH) {
+    } else if (this->currentIs(TokenType::SLASH)) {
       expression.binaryOperator = BinaryOperator::DIVIDE;
     }
     this->advance();
@@ -320,7 +324,7 @@ int Parser::parseMultiplyDivide() {
 }
 
 int Parser::parseUnary() {
-  if (this->current().type == TokenType::MINUS) {
+  if (this->currentIs(TokenType::MINUS)) {
     this->advance();
     int operandIndex = parsePrimary();
     if (operandIndex == -1) {
@@ -341,10 +345,10 @@ int Parser::parsePrimary() {
   Expression expression;
   switch (this->current().type) {
   case TokenType::IDENTIFIER: {
-    if (this->peek().type == TokenType::DOT) {
+    if (this->peekIs(TokenType::DOT)) {
       expression.tablePrefix = this->current().value;
       this->advance();
-      if (this->peek().type == TokenType::IDENTIFIER) {
+      if (this->peekIs(TokenType::IDENTIFIER)) {
         this->advance();
       } else {
         this->result.error = "Expected column name after '.' but found '" +
@@ -395,7 +399,7 @@ int Parser::parsePrimary() {
   case TokenType::TRUE:
   case TokenType::FALSE: {
     expression.kind = ExpressionKind::LITERAL_BOOL;
-    expression.boolValue = this->current().type == TokenType::TRUE;
+    expression.boolValue = this->currentIs(TokenType::TRUE);
     int index = static_cast<int>(this->result.expressions.size());
     this->result.expressions.push_back(expression);
     this->advance();
@@ -407,7 +411,7 @@ int Parser::parsePrimary() {
     if (index == -1) {
       return -1;
     }
-    if (this->current().type != TokenType::RIGHT_PAREN) {
+    if (!this->currentIs(TokenType::RIGHT_PAREN)) {
       this->result.error =
           "Syntax error at line " + std::to_string(this->current().line) +
           ": expected ')' but found '" + this->current().value + "'";
@@ -431,19 +435,19 @@ void Parser::parseInsert() {
                                "table name")) {
     return;
   }
-  if (this->current().type == TokenType::LEFT_PAREN) {
+  if (this->currentIs(TokenType::LEFT_PAREN)) {
     this->advance();
     this->result.statement.insertColumnNames.push_back(this->current().value);
     this->advance();
-    while (this->current().type != TokenType::RIGHT_PAREN &&
-           this->current().type != TokenType::SEMICOLON &&
-           this->current().type != TokenType::END_OF_FILE) {
-      if (this->current().type == TokenType::COMMA) {
+    while (!this->currentIs(TokenType::RIGHT_PAREN) &&
+           !this->currentIs(TokenType::SEMICOLON) &&
+           !this->currentIs(TokenType::END_OF_FILE)) {
+      if (this->currentIs(TokenType::COMMA)) {
         this->advance();
       }
       this->result.statement.insertColumnNames.push_back(this->current().value);
       this->advance();
-      if (this->current().type == TokenType::COMMA) {
+      if (this->currentIs(TokenType::COMMA)) {
         this->advance();
       }
     }
@@ -454,19 +458,19 @@ void Parser::parseInsert() {
   if (!this->consume(TokenType::VALUES, "VALUES")) {
     return;
   }
-  if (this->current().type == TokenType::LEFT_PAREN) {
+  if (this->currentIs(TokenType::LEFT_PAREN)) {
     this->advance();
     this->result.statement.insertValues.push_back(parseExpression());
-    if (this->current().type == TokenType::COMMA) {
+    if (this->currentIs(TokenType::COMMA)) {
       this->advance();
-      while (this->current().type != TokenType::RIGHT_PAREN &&
-             this->current().type != TokenType::SEMICOLON &&
-             this->current().type != TokenType::END_OF_FILE) {
-        if (this->current().type == TokenType::COMMA) {
+      while (!this->currentIs(TokenType::RIGHT_PAREN) &&
+             !this->currentIs(TokenType::SEMICOLON) &&
+             !this->currentIs(TokenType::END_OF_FILE)) {
+        if (this->currentIs(TokenType::COMMA)) {
           this->advance();
         }
         this->result.statement.insertValues.push_back(parseExpression());
-        if (this->current().type == TokenType::COMMA) {
+        if (this->currentIs(TokenType::COMMA)) {
           this->advance();
         }
       }
@@ -490,7 +494,7 @@ void Parser::parseDelete() {
                                "table name")) {
     return;
   }
-  if (this->current().type == TokenType::WHERE) {
+  if (this->currentIs(TokenType::WHERE)) {
     this->advance();
     int index = this->requireExpression("expected expression after WHERE");
     if (index == -1) {
@@ -520,14 +524,14 @@ void Parser::parseUpdate() {
     return;
   }
 
-  while (this->current().type == TokenType::COMMA) {
+  while (this->currentIs(TokenType::COMMA)) {
     this->advance();
     if (!this->parseAssignment()) {
       return;
     }
   }
 
-  if (this->current().type == TokenType::WHERE) {
+  if (this->currentIs(TokenType::WHERE)) {
     this->advance();
     int index = this->requireExpression("expected expression after WHERE");
     if (index == -1) {
@@ -537,6 +541,103 @@ void Parser::parseUpdate() {
   } else {
     this->result.statement.whereIndex = -1;
   }
+  if (!this->consume(TokenType::SEMICOLON, ";")) {
+    return;
+  }
+}
+
+void Parser::parseCreate() {
+  this->advance();
+  const Token &token = this->current();
+  if (token.value == "TABLE") {
+    return parseCreateTable();
+  }
+  // if (token.value == "INDEX") {
+  //   return parseCreateIndex();
+  // }
+  this->result.error =
+      "Syntax error at line " + std::to_string(this->current().line) +
+      ": expected 'TABLE' or 'INDEX' but found '" + this->current().value + "'";
+  return;
+}
+void Parser::parseCreateTable() {
+  this->advance();
+  this->result.statement.kind = StatementKind::CREATE_TABLE;
+  if (!this->consumeIdentifier(this->result.statement.tableName,
+                               "table name")) {
+    return;
+  }
+  if (!this->consume(TokenType::LEFT_PAREN, "(")) {
+    return;
+  }
+
+  while (!this->currentIs(TokenType::RIGHT_PAREN) &&
+         !this->currentIs(TokenType::SEMICOLON) &&
+         !this->currentIs(TokenType::END_OF_FILE)) {
+    ColumnDefinition colDefinition;
+    if (!this->consumeIdentifier(colDefinition.name, "column name")) {
+      return;
+    }
+
+    switch (this->current().type) {
+    case TokenType::INTEGER:
+      colDefinition.type = DataType::INTEGER;
+      this->advance();
+      break;
+    case TokenType::FLOAT:
+      colDefinition.type = DataType::FLOAT;
+      this->advance();
+      break;
+    case TokenType::TEXT:
+      colDefinition.type = DataType::TEXT;
+      // Optional text length
+      if (this->peekIs(TokenType::LEFT_PAREN)) {
+        this->advance(); // skip type
+        this->advance(); // skip (
+        colDefinition.textLength = std::stoi(this->current().value);
+        this->advance();
+        if (!this->consume(TokenType::RIGHT_PAREN, ")")) {
+          return;
+        }
+      } else {
+        colDefinition.textLength = 0;
+        this->advance();
+      }
+      break;
+    case TokenType::BOOLEAN:
+      colDefinition.type = DataType::BOOLEAN;
+      this->advance();
+      break;
+    default:
+      this->result.error =
+          "Syntax error at line " + std::to_string(this->current().line) +
+          ": expected 'INTEGER','FLOAT','TEXT' or 'BOOLEAN' but found '" +
+          this->current().value + "'";
+      return;
+    }
+
+    // Order of constraints does not matter
+    // so we can start with PRIMARY key
+    // or NOT NULL
+    while (this->currentIs(TokenType::PRIMARY) ||
+           this->currentIs(TokenType::NOT)) {
+      if (this->currentIs(TokenType::PRIMARY) && this->peekIs(TokenType::KEY)) {
+        colDefinition.primaryKey = true;
+        this->advance(); // skip PRIMARY
+        this->advance(); // skip KEY
+      }
+      if (this->currentIs(TokenType::NOT) && this->peekIs(TokenType::TKNULL)) {
+        colDefinition.notNull = true;
+        this->advance(); // skip NOT
+        this->advance(); // skip NULL
+      }
+    }
+    result.statement.columnDefinitions.push_back(colDefinition);
+    if (this->currentIs(TokenType::COMMA)) {
+      this->advance();
+    }
+  }
+  this->advance();
   if (!this->consume(TokenType::SEMICOLON, ";")) {
     return;
   }

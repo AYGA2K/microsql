@@ -42,6 +42,8 @@ TokenType getTokenTypeAlpha(std::string word) {
       {"DELETE", TokenType::DELETE},
       {"CREATE", TokenType::CREATE},
       {"DROP", TokenType::DROP},
+      {"PRIMARY", TokenType::PRIMARY},
+      {"KEY", TokenType::KEY},
       {"TABLE", TokenType::TABLE},
       {"INDEX", TokenType::INDEX},
       {"ON", TokenType::ON},
@@ -99,6 +101,10 @@ std::string toString(TokenType type) {
     return "CREATE";
   case TokenType::DROP:
     return "DROP";
+  case TokenType::PRIMARY:
+    return "PRIMARY";
+  case TokenType::KEY:
+    return "KEY";
   case TokenType::TABLE:
     return "TABLE";
   case TokenType::INDEX:

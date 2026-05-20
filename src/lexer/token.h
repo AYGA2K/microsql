@@ -12,6 +12,8 @@ enum class TokenType {
   DELETE,
   CREATE,
   DROP,
+  PRIMARY,
+  KEY,
   TABLE,
   INDEX,
   ON,
