@@ -954,3 +954,54 @@ TEST_CASE("CREATE TABLE missing semicolon produces error") {
   auto result = parse("CREATE TABLE users (id INTEGER)");
   CHECK_FALSE(result.error.empty());
 }
+
+TEST_CASE("CREATE INDEX basic") {
+  auto result = parse("CREATE INDEX ON users (id);");
+  CHECK(result.error.empty());
+  CHECK(result.statement.kind == StatementKind::CREATE_INDEX);
+  CHECK(result.statement.tableName == "users");
+  CHECK(result.statement.indexColumnName == "id");
+}
+
+TEST_CASE("CREATE INDEX on different table and column") {
+  auto result = parse("CREATE INDEX ON orders (customer_id);");
+  CHECK(result.error.empty());
+  CHECK(result.statement.kind == StatementKind::CREATE_INDEX);
+  CHECK(result.statement.tableName == "orders");
+  CHECK(result.statement.indexColumnName == "customer_id");
+}
+
+TEST_CASE("CREATE INDEX missing ON keyword produces error") {
+  auto result = parse("CREATE INDEX users (id);");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("CREATE INDEX missing table name produces error") {
+  auto result = parse("CREATE INDEX ON (id);");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("CREATE INDEX missing left paren produces error") {
+  auto result = parse("CREATE INDEX ON users id);");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("CREATE INDEX missing column name produces error") {
+  auto result = parse("CREATE INDEX ON users ();");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("CREATE INDEX missing right paren produces error") {
+  auto result = parse("CREATE INDEX ON users (id;");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("CREATE INDEX missing semicolon produces error") {
+  auto result = parse("CREATE INDEX ON users (id)");
+  CHECK_FALSE(result.error.empty());
+}
+
+TEST_CASE("CREATE with unknown keyword produces error") {
+  auto result = parse("CREATE VIEW users AS SELECT * FROM users;");
+  CHECK_FALSE(result.error.empty());
+}

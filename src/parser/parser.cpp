@@ -552,9 +552,9 @@ void Parser::parseCreate() {
   if (token.value == "TABLE") {
     return parseCreateTable();
   }
-  // if (token.value == "INDEX") {
-  //   return parseCreateIndex();
-  // }
+  if (token.value == "INDEX") {
+    return parseCreateIndex();
+  }
   this->result.error =
       "Syntax error at line " + std::to_string(this->current().line) +
       ": expected 'TABLE' or 'INDEX' but found '" + this->current().value + "'";
@@ -638,6 +638,36 @@ void Parser::parseCreateTable() {
     }
   }
   this->advance();
+  if (!this->consume(TokenType::SEMICOLON, ";")) {
+    return;
+  }
+}
+void Parser::parseCreateIndex() {
+  this->advance();
+  this->result.statement.kind = StatementKind::CREATE_INDEX;
+
+  if (!this->consume(TokenType::ON, "ON")) {
+    return;
+  }
+
+  if (!this->consumeIdentifier(this->result.statement.tableName,
+                               "table name")) {
+    return;
+  }
+
+  if (!this->consume(TokenType::LEFT_PAREN, "(")) {
+    return;
+  }
+
+  if (!this->consumeIdentifier(this->result.statement.indexColumnName,
+                               "Column name")) {
+    return;
+  }
+
+  if (!this->consume(TokenType::RIGHT_PAREN, ")")) {
+    return;
+  }
+
   if (!this->consume(TokenType::SEMICOLON, ";")) {
     return;
   }
