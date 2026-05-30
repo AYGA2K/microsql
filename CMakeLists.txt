@@ -22,11 +22,13 @@ set(SOURCES
     src/lexer/token.cpp
     src/lexer/lexer.cpp
     src/parser/parser.cpp
+    src/page/page.cpp
 )
 
 set(TEST_SOURCES
     tests/lexer_test.cpp
     tests/parser_test.cpp
+    tests/page_test.cpp
 )
 
 add_library(microsql_lib ${SOURCES})
