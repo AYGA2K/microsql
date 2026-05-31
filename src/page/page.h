@@ -1,6 +1,14 @@
 #include <cstdint>
+#include <expected>
 #include <fstream>
 #include <string>
+
+enum class PageError {
+  InvalidRowLength,
+  PageFull,
+  SlotOutOfBounds,
+  SlotDeleted,
+};
 inline constexpr int PAGE_SIZE = 4096;
 inline constexpr int HEADER_SIZE = 16;
 inline constexpr int SLOT_ENTRY_SIZE = 4;
@@ -30,10 +38,10 @@ struct Page {
   uint16_t numSlots() const;
   bool slotDeleted(uint16_t slotIndex) const;
   void init(uint32_t id);
-  int insertRow(const uint8_t *rowBytes, uint16_t rowLen);
-  uint8_t *readRow(uint16_t slotIndex, uint16_t *rowLen);
-  uint8_t *deleteRow(uint16_t slotIndex);
-  uint8_t *updateRow(uint16_t slotIndex, const uint8_t *rowBytes, uint16_t rowLen);
+  std::expected<int, PageError> insertRow(const uint8_t *rowBytes, uint16_t rowLen);
+  std::expected<uint8_t *, PageError> readRow(uint16_t slotIndex, uint16_t *rowLen);
+  std::expected<uint8_t *, PageError> deleteRow(uint16_t slotIndex);
+  std::expected<uint8_t *, PageError> updateRow(uint16_t slotIndex, const uint8_t *rowBytes, uint16_t rowLen);
 };
 
 struct TableFile {
