@@ -36,6 +36,10 @@ void Page::init(uint32_t id) {
 }
 
 int Page::insertRow(const uint8_t *rowBytes, uint16_t rowLen) {
+  if (rowLen == 0) {
+    return -1;
+  }
+
   uint16_t slots = this->numSlots();
   uint16_t freeptr = this->read16(HEADER_OFFSET_FREE_PTR);
   int slotDirEnd = HEADER_SIZE + (slots * SLOT_ENTRY_SIZE);
@@ -94,18 +98,36 @@ uint8_t *Page::updateRow(uint16_t slotIndex, const uint8_t *rowBytes,
   if (slotIndex >= this->numSlots()) {
     return nullptr;
   }
+  if (this->slotDeleted(slotIndex)) {
+    return nullptr;
+  }
 
-  int slot = HEADER_SIZE + slotIndex * SLOT_ENTRY_SIZE;
-  uint16_t oldRowOffset = this->read16(slot);
-  uint16_t oldRowLen = this->read16(slot + 2);
+  int slotOffset = HEADER_SIZE + slotIndex * SLOT_ENTRY_SIZE;
+  uint16_t oldRowOffset = this->read16(slotOffset);
+  uint16_t oldRowLen = this->read16(slotOffset + 2);
 
   if (rowLen == 0) {
     return nullptr;
   }
-  if (oldRowLen != rowLen) {
-    return nullptr;
+  // If the new row length > than the old row => insert the new updated row at
+  // the top and update the slot data in the slot entry
+  if (rowLen > oldRowLen) {
+    if (this->freeSpace() < rowLen) {
+      return nullptr;
+    }
+    uint16_t freeptr = this->read16(HEADER_OFFSET_FREE_PTR);
+    uint16_t newRowOffset = freeptr - rowLen;
+    // Insert the new row
+    std::memcpy(data + newRowOffset, rowBytes, rowLen);
+
+    // Update the slot data
+    this->write16(slotOffset, newRowOffset);
+    this->write16(slotOffset + 2, rowLen);
+    this->write16(HEADER_OFFSET_FREE_PTR, newRowOffset);
+    oldRowOffset = newRowOffset;
+  } else {
+    std::memcpy(data + oldRowOffset, rowBytes, rowLen);
   }
-  std::memcpy(data + oldRowOffset, rowBytes, rowLen);
   this->isDirty = true;
 
   return this->data + oldRowOffset;

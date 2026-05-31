@@ -43,6 +43,13 @@ TEST_CASE("insertRow reduces freeSpace by rowLen + SLOT_ENTRY_SIZE") {
   CHECK(p.freeSpace() == before - 20 - SLOT_ENTRY_SIZE);
 }
 
+TEST_CASE("insertRow returns -1 for zero length row") {
+  Page p = makePage();
+  uint8_t dummy = 0;
+  CHECK(p.insertRow(&dummy, 0) == -1);
+  CHECK(p.numSlots() == 0);
+}
+
 TEST_CASE("insertRow returns -1 when page is full") {
   Page p = makePage();
   // fill the page until it rejects an insert
@@ -125,12 +132,48 @@ TEST_CASE("updateRow overwrites data in place") {
   CHECK(std::memcmp(read, updated.data(), 16) == 0);
 }
 
-TEST_CASE("updateRow returns nullptr when new size differs from old size") {
+TEST_CASE("updateRow grows row into free space") {
   Page p = makePage();
-  auto row = makeRow(16);
-  p.insertRow(row.data(), row.size());
+  auto original = makeRow(16, 0xAA);
+  auto bigger   = makeRow(20, 0xBB);
+  p.insertRow(original.data(), original.size());
 
-  auto bigger = makeRow(20);
+  uint8_t *ptr = p.updateRow(0, bigger.data(), bigger.size());
+  REQUIRE(ptr != nullptr);
+  CHECK(std::memcmp(ptr, bigger.data(), 20) == 0);
+
+  uint16_t len = 0;
+  uint8_t *read = p.readRow(0, &len);
+  REQUIRE(read != nullptr);
+  CHECK(len == 20);
+  CHECK(std::memcmp(read, bigger.data(), 20) == 0);
+}
+
+TEST_CASE("updateRow grow updates free pointer so next insert does not corrupt it") {
+  Page p = makePage();
+  auto original = makeRow(16, 0xAA);
+  auto bigger   = makeRow(20, 0xBB);
+  p.insertRow(original.data(), original.size());
+  p.updateRow(0, bigger.data(), bigger.size());
+
+  auto newRow = makeRow(8, 0xCC);
+  int slot = p.insertRow(newRow.data(), newRow.size());
+  CHECK(slot == 1);
+
+  uint16_t len = 0;
+  uint8_t *read = p.readRow(0, &len);
+  REQUIRE(read != nullptr);
+  CHECK(std::memcmp(read, bigger.data(), 20) == 0);
+}
+
+TEST_CASE("updateRow returns nullptr when page has no space to grow row") {
+  Page p = makePage();
+  auto row = makeRow(100, 0xAA);
+  p.insertRow(row.data(), row.size());
+  auto filler = makeRow(100, 0xFF);
+  while (p.insertRow(filler.data(), filler.size()) != -1) {}
+
+  auto bigger = makeRow(200, 0xBB);
   CHECK(p.updateRow(0, bigger.data(), bigger.size()) == nullptr);
 }
 
