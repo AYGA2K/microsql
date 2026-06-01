@@ -1,5 +1,6 @@
 #include "page.h"
 #include "expected"
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 
@@ -65,7 +66,7 @@ std::expected<int, PageError> Page::insertRow(const uint8_t *rowBytes,
 }
 
 std::expected<uint8_t *, PageError> Page::readRow(uint16_t slotIndex,
-                                                   uint16_t *rowLen) {
+                                                  uint16_t *rowLen) {
   if (slotIndex >= this->numSlots()) {
     return std::unexpected(PageError::SlotOutOfBounds);
   }
@@ -96,9 +97,8 @@ std::expected<uint8_t *, PageError> Page::deleteRow(uint16_t slotIndex) {
   return this->data + rowOffset;
 }
 
-std::expected<uint8_t *, PageError> Page::updateRow(uint16_t slotIndex,
-                                                     const uint8_t *rowBytes,
-                                                     uint16_t rowLen) {
+std::expected<uint8_t *, PageError>
+Page::updateRow(uint16_t slotIndex, const uint8_t *rowBytes, uint16_t rowLen) {
   if (slotIndex >= this->numSlots()) {
     return std::unexpected(PageError::SlotOutOfBounds);
   }
@@ -134,4 +134,109 @@ std::expected<uint8_t *, PageError> Page::updateRow(uint16_t slotIndex,
 
   this->isDirty = true;
   return this->data + oldRowOffset;
+}
+
+std::expected<void, TableFileError> TableFile::open(const std::string &path) {
+  this->filePath = path;
+  this->file.open(path, std::ios::binary | std::ios::in | std::ios::out);
+  if (!this->file) {
+    return std::unexpected(TableFileError::FailedToOpenFile);
+  }
+  return {};
+}
+
+void TableFile::close() {
+  if (this->file.is_open()) {
+    this->file.flush();
+    this->file.close();
+  }
+}
+
+std::expected<void, TableFileError> TableFile::readPage(uint32_t pageId,
+                                                        Page &page) {
+
+  if (!this->file.is_open()) {
+    return std::unexpected(TableFileError::FileNotOpen);
+  }
+  this->file.seekg(static_cast<std::streamoff>(page.pageId) * PAGE_SIZE,
+                   std::ios::beg);
+  if (!this->file) {
+    return std::unexpected(TableFileError::FailedToSeekPage);
+  }
+  this->file.read(reinterpret_cast<char *>(page.data), PAGE_SIZE);
+  if (!this->file) {
+    return std::unexpected(TableFileError::FailedToReadPage);
+  }
+  page.pageId = pageId;
+  page.isDirty = false;
+  return {};
+}
+
+std::expected<void, TableFileError> TableFile::writePage(const Page &page) {
+  if (!this->file.is_open()) {
+    return std::unexpected(TableFileError::FileNotOpen);
+  }
+  this->file.seekg(static_cast<std::streamoff>(page.pageId) * PAGE_SIZE,
+                   std::ios::beg);
+  if (!this->file) {
+    return std::unexpected(TableFileError::FailedToSeekPage);
+  }
+  this->file.write(reinterpret_cast<const char *>(page.data), PAGE_SIZE);
+  if (!this->file) {
+    return std::unexpected(TableFileError::FailedToWritePage);
+  }
+  file.flush();
+  if (!this->file) {
+    return std::unexpected(TableFileError::FailedToWritePage);
+  }
+  return {};
+}
+
+std::expected<size_t, TableFileError> TableFile::numPages() {
+  if (!this->file.is_open()) {
+    return std::unexpected(TableFileError::FileNotOpen);
+  }
+
+  this->file.clear();
+  this->file.seekg(0, std::ios::end);
+  if (!this->file) {
+    return std::unexpected(TableFileError::FailedToSeekPage);
+  }
+
+  auto pos = this->file.tellg();
+  if (pos == std::streampos(-1)) {
+    return std::unexpected(TableFileError::FailedToGetFileSize);
+  }
+  std::size_t size = static_cast<std::size_t>(pos);
+  return (size + PAGE_SIZE - 1) / PAGE_SIZE;
+}
+
+std::expected<uint32_t, TableFileError> TableFile::allocatePage() {
+  if (!this->file.is_open()) {
+    return std::unexpected(TableFileError::FileNotOpen);
+  }
+
+  this->file.clear();
+  this->file.seekp(0, std::ios::end);
+  if (!this->file) {
+    return std::unexpected(TableFileError::FailedToSeekPage);
+  }
+
+  std::array<char, PAGE_SIZE> page{};
+  this->file.write(page.data(), PAGE_SIZE);
+  if (!this->file) {
+    return std::unexpected(TableFileError::FailedToWritePage);
+  }
+
+  this->file.flush();
+  if (!this->file) {
+    return std::unexpected(TableFileError::FailedToWritePage);
+  }
+
+  auto pages = this->numPages();
+  if (!pages) {
+    return std::unexpected(pages.error());
+  }
+
+  return static_cast<uint32_t>(pages.value() - 1);
 }

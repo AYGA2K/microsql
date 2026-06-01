@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <cstdint>
 #include <expected>
 #include <fstream>
@@ -8,6 +9,14 @@ enum class PageError {
   PageFull,
   SlotOutOfBounds,
   SlotDeleted,
+};
+enum class TableFileError {
+  FileNotOpen,
+  FailedToOpenFile,
+  FailedToSeekPage,
+  FailedToReadPage,
+  FailedToWritePage,
+  FailedToGetFileSize,
 };
 inline constexpr int PAGE_SIZE = 4096;
 inline constexpr int HEADER_SIZE = 16;
@@ -38,20 +47,23 @@ struct Page {
   uint16_t numSlots() const;
   bool slotDeleted(uint16_t slotIndex) const;
   void init(uint32_t id);
-  std::expected<int, PageError> insertRow(const uint8_t *rowBytes, uint16_t rowLen);
-  std::expected<uint8_t *, PageError> readRow(uint16_t slotIndex, uint16_t *rowLen);
+  std::expected<int, PageError> insertRow(const uint8_t *rowBytes,
+                                          uint16_t rowLen);
+  std::expected<uint8_t *, PageError> readRow(uint16_t slotIndex,
+                                              uint16_t *rowLen);
   std::expected<uint8_t *, PageError> deleteRow(uint16_t slotIndex);
-  std::expected<uint8_t *, PageError> updateRow(uint16_t slotIndex, const uint8_t *rowBytes, uint16_t rowLen);
+  std::expected<uint8_t *, PageError>
+  updateRow(uint16_t slotIndex, const uint8_t *rowBytes, uint16_t rowLen);
 };
 
 struct TableFile {
   std::string filePath;
   std::fstream file;
 
-  bool open(const std::string &path);
+  std::expected<void, TableFileError> open(const std::string &path);
   void close();
-  void readPage(uint32_t pageId, Page &p);
-  void writePage(const Page &p);
-  uint32_t allocatePage();
-  int numPages();
+  std::expected<void, TableFileError> readPage(uint32_t pageId, Page &page);
+  std::expected<void, TableFileError> writePage(const Page &page);
+  std::expected<uint32_t, TableFileError> allocatePage();
+  std::expected<size_t, TableFileError> numPages();
 };
