@@ -130,6 +130,7 @@ Page::updateRow(uint16_t slotIndex, const uint8_t *rowBytes, uint16_t rowLen) {
     oldRowOffset = newRowOffset;
   } else {
     std::memcpy(data + oldRowOffset, rowBytes, rowLen);
+    this->write16(slotOffset + 2, rowLen);
   }
 
   this->isDirty = true;
