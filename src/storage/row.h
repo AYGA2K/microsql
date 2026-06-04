@@ -1,0 +1,21 @@
+#pragma once
+#include "../ast/statement.h"
+#include <cstdint>
+#include <expected>
+#include <string>
+#include <variant>
+#include <vector>
+
+enum class RowError { SchemaMismatch, DataTypeNotSupported };
+
+using Value = std::variant<int64_t, double, std::string, bool, std::nullptr_t>;
+using Row = std::vector<Value>;
+using Schema = std::vector<ColumnDefinition>;
+
+uint16_t rowSize(const Schema &schema);
+
+std::expected<void, RowError> serializeRow(const Row &row, const Schema &schema,
+                                           uint8_t *output);
+
+std::expected<Row, RowError> deserializeRow(const uint8_t *data,
+                                            const Schema &schema);
