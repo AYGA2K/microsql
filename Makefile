@@ -14,10 +14,11 @@ run:
 	./$(BUILD_DIR)/microsql
 
 test:
-	cmake --build $(BUILD_DIR) --target lexer_test --target parser_test --target page_test
+	cmake --build $(BUILD_DIR) --target lexer_test --target parser_test --target page_test --target row_test
 	./$(BUILD_DIR)/lexer_test
 	./$(BUILD_DIR)/parser_test
 	./$(BUILD_DIR)/page_test
+	./$(BUILD_DIR)/row_test
 
 clean:
 	rm -rf $(BUILD_DIR)
