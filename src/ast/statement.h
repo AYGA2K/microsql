@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -22,6 +23,16 @@ struct ColumnDefinition {
   int textLength; // for TEXT(n); 0 otherwise
   bool notNull = false;
   bool primaryKey = false;
+
+  uint16_t size() const {
+    switch (type) {
+    case DataType::BOOLEAN: return 1;
+    case DataType::INTEGER: return 8;
+    case DataType::FLOAT:   return 8;
+    case DataType::TEXT:    return static_cast<uint16_t>(textLength);
+    }
+    return 0;
+  }
 };
 
 struct Statement {

@@ -12,8 +12,6 @@ using Value = std::variant<int64_t, double, std::string, bool, std::nullptr_t>;
 using Row = std::vector<Value>;
 using Schema = std::vector<ColumnDefinition>;
 
-uint16_t rowSize(const Schema &schema);
-
 std::expected<void, RowError> serializeRow(const Row &row, const Schema &schema,
                                            uint8_t *output);
 
