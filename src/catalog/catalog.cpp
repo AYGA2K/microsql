@@ -3,6 +3,7 @@
 #include "ast/statement.h"
 #include "catalog/tableschema.h"
 #include <expected>
+#include <print>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -29,23 +30,31 @@ std::vector<std::string> split(const std::string &s) {
 }
 
 std::expected<void, CatalogError> Catalog::load(const std::string &directory) {
-  std::ifstream file(directory + "/catalog.txt");
+  std::string path = directory + "/catalog.txt";
+  std::ifstream file(path);
   if (!file.is_open()) {
+    std::println(stderr, "[Catalog] failed to open '{}'", path);
     return std::unexpected(CatalogError::FileNotOpen);
   }
   std::string line;
+  int lineNum = 0;
   while (std::getline(file, line)) {
+    lineNum++;
     if (line.starts_with("TABLE")) {
       TableSchema tableSchema;
       auto words = split(line);
       if (words.size() != 2) {
+        std::println(stderr, "[Catalog] invalid TABLE line {}: '{}'", lineNum, line);
         return std::unexpected(CatalogError::UnvalidTableLineFormat);
       }
       tableSchema.tableName = words[1];
       while (std::getline(file, line) && line != "END") {
+        lineNum++;
         if (line.starts_with("COLUMN")) {
           words = split(line);
           if (words.size() != 6) {
+            std::println(stderr, "[Catalog] invalid COLUMN line {} in table '{}': '{}'",
+                         lineNum, tableSchema.tableName, line);
             return std::unexpected(CatalogError::UnvalidColumnLineFormat);
           }
           ColumnDefinition column;
