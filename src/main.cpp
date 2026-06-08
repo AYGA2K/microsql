@@ -1,15 +1,15 @@
-#include "fmt/base.h"
 #include "lexer/lexer.h"
 #include "lexer/token.h"
+#include <print>
 #include <string>
 int main() {
   std::string query = "Select * from users;";
-  fmt::println("{}", query);
+  std::println("{}", query);
   Lexer lexer;
   lexer.query = query;
   auto tokens = lexer.tokenize();
   for (auto token : tokens) {
-    fmt::println("{}", toString(token));
+    std::println("{}", toString(token));
   }
   return 0;
 }
