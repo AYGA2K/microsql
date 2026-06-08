@@ -24,6 +24,8 @@ set(SOURCES
     src/parser/parser.cpp
     src/storage/page.cpp
     src/storage/row.cpp
+    src/catalog/catalog.cpp
+    src/catalog/tableschema.cpp
 )
 
 set(TEST_SOURCES
@@ -31,6 +33,7 @@ set(TEST_SOURCES
     tests/parser_test.cpp
     tests/page_test.cpp
     tests/row_test.cpp
+    tests/catalog_test.cpp
 )
 
 add_library(microsql_lib ${SOURCES})
