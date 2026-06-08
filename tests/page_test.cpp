@@ -378,9 +378,8 @@ TEST_CASE("TableFile::writePage returns FileNotOpen when file is not open") {
 }
 
 TEST_CASE("TableFile::readPage returns FileNotOpen when file is not open") {
-  Page p = makePage(0);
   TableFile tf;
-  auto result = tf.readPage(0, p);
+  auto result = tf.readPage(0);
   REQUIRE_FALSE(result.has_value());
   CHECK(result.error() == TableFileError::FileNotOpen);
 }
@@ -389,9 +388,7 @@ TEST_CASE("TableFile::readPage fails on out-of-bounds page id") {
   TempFile tmp;
   TableFile tf;
   REQUIRE(tf.open(tmp.path).has_value());
-  Page p;
-  p.pageId = 0;
-  auto result = tf.readPage(0, p);
+  auto result = tf.readPage(0);
   REQUIRE_FALSE(result.has_value());
   tf.close();
 }
@@ -407,17 +404,18 @@ TEST_CASE("TableFile write then read preserves page contents") {
   REQUIRE(written.insertRow(row.data(), row.size()).has_value());
   REQUIRE(tf.writePage(written).has_value());
 
-  Page read;
-  read.pageId = 0;
-  REQUIRE(tf.readPage(0, read).has_value());
-  CHECK(read.pageId == 0);
-  CHECK(read.numSlots() == 1);
+  auto readResult = tf.readPage(0);
+  REQUIRE(readResult.has_value());
+  Page *read = *readResult;
+  CHECK(read->pageId == 0);
+  CHECK(read->numSlots() == 1);
 
   uint16_t len = 0;
-  auto data = read.readRow(0, &len);
+  auto data = read->readRow(0, &len);
   REQUIRE(data.has_value());
   CHECK(len == 32);
   CHECK(std::memcmp(*data, row.data(), 32) == 0);
+  delete read;
   tf.close();
 }
 
@@ -439,19 +437,21 @@ TEST_CASE("TableFile multiple pages are stored independently") {
   REQUIRE(tf.writePage(p1).has_value());
 
   uint16_t len = 0;
-  Page r0;
-  r0.pageId = 0;
-  REQUIRE(tf.readPage(0, r0).has_value());
-  auto d0 = r0.readRow(0, &len);
+  auto r0Result = tf.readPage(0);
+  REQUIRE(r0Result.has_value());
+  Page *r0 = *r0Result;
+  auto d0 = r0->readRow(0, &len);
   REQUIRE(d0.has_value());
   CHECK(std::memcmp(*d0, row0.data(), 8) == 0);
+  delete r0;
 
-  Page r1;
-  r1.pageId = 1;
-  REQUIRE(tf.readPage(1, r1).has_value());
-  auto d1 = r1.readRow(0, &len);
+  auto r1Result = tf.readPage(1);
+  REQUIRE(r1Result.has_value());
+  Page *r1 = *r1Result;
+  auto d1 = r1->readRow(0, &len);
   REQUIRE(d1.has_value());
   CHECK(std::memcmp(*d1, row1.data(), 8) == 0);
+  delete r1;
 
   tf.close();
 }
@@ -472,13 +472,14 @@ TEST_CASE("TableFile overwriting a page replaces its content") {
   REQUIRE(second.insertRow(row2.data(), row2.size()).has_value());
   REQUIRE(tf.writePage(second).has_value());
 
-  Page read;
-  read.pageId = 0;
-  REQUIRE(tf.readPage(0, read).has_value());
+  auto readResult = tf.readPage(0);
+  REQUIRE(readResult.has_value());
+  Page *read = *readResult;
   uint16_t len = 0;
-  auto data = read.readRow(0, &len);
+  auto data = read->readRow(0, &len);
   REQUIRE(data.has_value());
   CHECK(std::memcmp(*data, row2.data(), 8) == 0);
+  delete read;
   tf.close();
 }
 
@@ -503,15 +504,16 @@ TEST_CASE("TableFile data persists across close and reopen") {
     REQUIRE(pages.has_value());
     CHECK(*pages == 1);
 
-    Page p;
-    p.pageId = 0;
-    REQUIRE(tf.readPage(0, p).has_value());
+    auto pResult = tf.readPage(0);
+    REQUIRE(pResult.has_value());
+    Page *p = *pResult;
     uint16_t len = 0;
-    auto data = p.readRow(0, &len);
+    auto data = p->readRow(0, &len);
     REQUIRE(data.has_value());
     CHECK(len == 16);
     auto expected = makeRow(16, 0xCC);
     CHECK(std::memcmp(*data, expected.data(), 16) == 0);
+    delete p;
     tf.close();
   }
 }
@@ -528,9 +530,10 @@ TEST_CASE("TableFile readPage resets isDirty on loaded page") {
   CHECK(written.isDirty == true);
   REQUIRE(tf.writePage(written).has_value());
 
-  Page read;
-  read.pageId = 0;
-  REQUIRE(tf.readPage(0, read).has_value());
-  CHECK(read.isDirty == false);
+  auto readResult = tf.readPage(0);
+  REQUIRE(readResult.has_value());
+  Page *read = *readResult;
+  CHECK(read->isDirty == false);
+  delete read;
   tf.close();
 }

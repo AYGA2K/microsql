@@ -153,24 +153,24 @@ void TableFile::close() {
   }
 }
 
-std::expected<void, TableFileError> TableFile::readPage(uint32_t pageId,
-                                                        Page &page) {
-
+std::expected<Page *, TableFileError> TableFile::readPage(uint32_t pageId) {
   if (!this->file.is_open()) {
     return std::unexpected(TableFileError::FileNotOpen);
   }
-  this->file.seekg(static_cast<std::streamoff>(page.pageId) * PAGE_SIZE,
+  this->file.seekg(static_cast<std::streamoff>(pageId) * PAGE_SIZE,
                    std::ios::beg);
   if (!this->file) {
     return std::unexpected(TableFileError::FailedToSeekPage);
   }
-  this->file.read(reinterpret_cast<char *>(page.data), PAGE_SIZE);
+  Page *page = new Page{};
+  this->file.read(reinterpret_cast<char *>(page->data), PAGE_SIZE);
   if (!this->file) {
+    delete page;
     return std::unexpected(TableFileError::FailedToReadPage);
   }
-  page.pageId = pageId;
-  page.isDirty = false;
-  return {};
+  page->pageId = pageId;
+  page->isDirty = false;
+  return page;
 }
 
 std::expected<void, TableFileError> TableFile::writePage(const Page &page) {

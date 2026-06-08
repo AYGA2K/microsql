@@ -62,7 +62,7 @@ struct TableFile {
 
   std::expected<void, TableFileError> open(const std::string &path);
   void close();
-  std::expected<void, TableFileError> readPage(uint32_t pageId, Page &page);
+  std::expected<Page *, TableFileError> readPage(uint32_t pageId);
   std::expected<void, TableFileError> writePage(const Page &page);
   std::expected<uint32_t, TableFileError> allocatePage();
   std::expected<size_t, TableFileError> numPages();
