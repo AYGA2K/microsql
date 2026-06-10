@@ -38,8 +38,6 @@ inline constexpr int HEADER_OFFSET_FLAGS = 8;     // 4 bytes
 struct Page {
   uint8_t data[PAGE_SIZE];
   uint32_t pageId;
-  bool isDirty; // whether this page has been modified since it was last written
-  // to disk.
 
   uint16_t read16(size_t offset) const;
   void write16(size_t offset, uint16_t value);

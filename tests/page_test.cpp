@@ -16,7 +16,6 @@ static std::vector<uint8_t> makeRow(uint16_t len, uint8_t fill = 0xAB) {
 
 TEST_CASE("init sets clean state") {
   Page p = makePage(42);
-  CHECK(p.isDirty == false);
   CHECK(p.pageId == 42);
   CHECK(p.numSlots() == 0);
   CHECK(p.freeSpace() == PAGE_SIZE - HEADER_SIZE);
@@ -29,7 +28,6 @@ TEST_CASE("insertRow returns slot index and updates numSlots") {
   REQUIRE(slot.has_value());
   CHECK(*slot == 0);
   CHECK(p.numSlots() == 1);
-  CHECK(p.isDirty == true);
 
   auto row2 = makeRow(8, 0xCD);
   auto slot2 = p.insertRow(row2.data(), row2.size());
@@ -518,7 +516,7 @@ TEST_CASE("TableFile data persists across close and reopen") {
   }
 }
 
-TEST_CASE("TableFile readPage resets isDirty on loaded page") {
+TEST_CASE("TableFile readPage loads page data from disk") {
   TempFile tmp;
   TableFile tf;
   REQUIRE(tf.open(tmp.path).has_value());
@@ -527,13 +525,12 @@ TEST_CASE("TableFile readPage resets isDirty on loaded page") {
   Page written = makePage(0);
   auto row = makeRow(8, 0x77);
   REQUIRE(written.insertRow(row.data(), row.size()).has_value());
-  CHECK(written.isDirty == true);
   REQUIRE(tf.writePage(written).has_value());
 
   auto readResult = tf.readPage(0);
   REQUIRE(readResult.has_value());
   Page *read = *readResult;
-  CHECK(read->isDirty == false);
+  CHECK(read->pageId == 0);
   delete read;
   tf.close();
 }

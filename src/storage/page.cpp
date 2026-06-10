@@ -30,7 +30,6 @@ bool Page::slotDeleted(uint16_t slotIndex) const {
 }
 
 void Page::init(uint32_t id) {
-  this->isDirty = false;
   this->pageId = id;
   std::memset(this->data, 0, PAGE_SIZE);
   this->write16(HEADER_OFFSET_NUM_SLOTS, 0);
@@ -61,7 +60,6 @@ std::expected<int, PageError> Page::insertRow(const uint8_t *rowBytes,
   this->write16(HEADER_OFFSET_FREE_PTR, offset);
   this->write16(HEADER_OFFSET_NUM_SLOTS, slots + 1);
 
-  this->isDirty = true;
   return slots;
 }
 
@@ -133,7 +131,6 @@ Page::updateRow(uint16_t slotIndex, const uint8_t *rowBytes, uint16_t rowLen) {
     this->write16(slotOffset + 2, rowLen);
   }
 
-  this->isDirty = true;
   return this->data + oldRowOffset;
 }
 
@@ -169,7 +166,6 @@ std::expected<Page *, TableFileError> TableFile::readPage(uint32_t pageId) {
     return std::unexpected(TableFileError::FailedToReadPage);
   }
   page->pageId = pageId;
-  page->isDirty = false;
   return page;
 }
 
