@@ -21,6 +21,7 @@ set(SOURCES
     src/storage/row.cpp
     src/catalog/catalog.cpp
     src/catalog/tableschema.cpp
+    src/buffer_pool/buffer_pool.cpp
 )
 
 set(TEST_SOURCES
@@ -29,6 +30,7 @@ set(TEST_SOURCES
     tests/page_test.cpp
     tests/row_test.cpp
     tests/catalog_test.cpp
+    tests/buffer_pool_test.cpp
 )
 
 add_library(microsql_lib ${SOURCES})

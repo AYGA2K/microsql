@@ -13,13 +13,13 @@ build:
 run:
 	./$(BUILD_DIR)/microsql
 
+TEST_NAMES := $(patsubst tests/%.cpp,%,$(wildcard tests/*.cpp))
+TEST_BINS  := $(addprefix $(BUILD_DIR)/,$(TEST_NAMES))
+TEST_TARGETS := $(addprefix --target ,$(TEST_NAMES))
+
 test:
-	cmake --build $(BUILD_DIR) --target lexer_test --target parser_test --target page_test --target row_test --target catalog_test
-	./$(BUILD_DIR)/lexer_test
-	./$(BUILD_DIR)/parser_test
-	./$(BUILD_DIR)/page_test
-	./$(BUILD_DIR)/row_test
-	./$(BUILD_DIR)/catalog_test
+	cmake --build $(BUILD_DIR) $(TEST_TARGETS)
+	$(foreach bin,$(TEST_BINS),./$(bin);)
 
 clean:
 	rm -rf $(BUILD_DIR)
