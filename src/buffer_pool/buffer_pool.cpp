@@ -116,6 +116,9 @@ BufferPool::newPage(const std::string &tableName) {
   TableFile *tableFile = this->openFiles.at(tableName);
   auto pageId = tableFile->allocatePage();
   if (!pageId) {
+    std::println(stderr,
+                 "[BufferPool] failed to allocate new page for table '{}': {}",
+                 tableName, tableFileErrorStr(pageId.error()));
     return std::unexpected(BufferPoolError::ErrorAllocatingNewPage);
   }
   Frame &frame = frames[victim];
@@ -123,6 +126,9 @@ BufferPool::newPage(const std::string &tableName) {
     TableFile *evicteeFile = openFiles[frame.tableName];
     auto ok = evicteeFile->writePage(*frame.page);
     if (!ok) {
+      std::println(stderr,
+                   "[BufferPool] failed to evict page {} of table '{}': {}",
+                   frame.pageId, frame.tableName, tableFileErrorStr(ok.error()));
       return std::unexpected(BufferPoolError::ErrorWritingPage);
     }
   }
@@ -148,6 +154,9 @@ BufferPool::flushPage(const std::string &tableName, uint32_t pageId) {
         frame.isDirty) {
       auto ok = tablefile->writePage(*frame.page);
       if (!ok) {
+        std::println(stderr,
+                     "[BufferPool] failed to flush page {} of table '{}': {}",
+                     pageId, tableName, tableFileErrorStr(ok.error()));
         return std::unexpected(BufferPoolError::ErrorWritingPage);
       }
     }
@@ -162,6 +171,10 @@ std::expected<void, BufferPoolError> BufferPool::flushAll() {
       TableFile *tablefile = this->openFiles.at(frame.tableName);
       auto ok = tablefile->writePage(*frame.page);
       if (!ok) {
+        std::println(stderr,
+                     "[BufferPool] failed to flush page {} of table '{}': {}",
+                     frame.pageId, frame.tableName,
+                     tableFileErrorStr(ok.error()));
         return std::unexpected(BufferPoolError::ErrorWritingPage);
       }
     }
