@@ -46,11 +46,11 @@ struct Page {
   uint16_t numSlots() const;
   bool slotDeleted(uint16_t slotIndex) const;
   void init(uint32_t id);
-  std::expected<int, PageError> insertRow(const uint8_t *rowBytes,
-                                          uint16_t rowLen);
+  std::expected<void, PageError> insertRow(const uint8_t *rowBytes,
+                                           uint16_t rowLen);
   std::expected<uint8_t *, PageError> readRow(uint16_t slotIndex,
                                               uint16_t *rowLen);
-  std::expected<uint8_t *, PageError> deleteRow(uint16_t slotIndex);
+  std::expected<void, PageError> deleteRow(uint16_t slotIndex);
   std::expected<uint8_t *, PageError>
   updateRow(uint16_t slotIndex, const uint8_t *rowBytes, uint16_t rowLen);
 };

@@ -36,8 +36,8 @@ void Page::init(uint32_t id) {
   this->write16(HEADER_OFFSET_FREE_PTR, PAGE_SIZE);
 }
 
-std::expected<int, PageError> Page::insertRow(const uint8_t *rowBytes,
-                                              uint16_t rowLen) {
+std::expected<void, PageError> Page::insertRow(const uint8_t *rowBytes,
+                                               uint16_t rowLen) {
   if (rowLen == 0) {
     return std::unexpected(PageError::InvalidRowLength);
   }
@@ -60,7 +60,7 @@ std::expected<int, PageError> Page::insertRow(const uint8_t *rowBytes,
   this->write16(HEADER_OFFSET_FREE_PTR, offset);
   this->write16(HEADER_OFFSET_NUM_SLOTS, slots + 1);
 
-  return slots;
+  return {};
 }
 
 std::expected<uint8_t *, PageError> Page::readRow(uint16_t slotIndex,
@@ -79,7 +79,7 @@ std::expected<uint8_t *, PageError> Page::readRow(uint16_t slotIndex,
   return this->data + rowOffset;
 }
 
-std::expected<uint8_t *, PageError> Page::deleteRow(uint16_t slotIndex) {
+std::expected<void, PageError> Page::deleteRow(uint16_t slotIndex) {
   if (slotIndex >= this->numSlots()) {
     return std::unexpected(PageError::SlotOutOfBounds);
   }
@@ -88,11 +88,9 @@ std::expected<uint8_t *, PageError> Page::deleteRow(uint16_t slotIndex) {
   }
 
   int slot = HEADER_SIZE + slotIndex * SLOT_ENTRY_SIZE;
-  uint16_t rowOffset = this->read16(slot);
-
   this->write16(slot + 2, 0);
 
-  return this->data + rowOffset;
+  return {};
 }
 
 std::expected<uint8_t *, PageError>

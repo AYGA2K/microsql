@@ -13,25 +13,9 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(doctest)
 
-set(SOURCES
-    src/lexer/token.cpp
-    src/lexer/lexer.cpp
-    src/parser/parser.cpp
-    src/storage/page.cpp
-    src/storage/row.cpp
-    src/catalog/catalog.cpp
-    src/catalog/tableschema.cpp
-    src/buffer_pool/buffer_pool.cpp
-)
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/**/*.cpp)
 
-set(TEST_SOURCES
-    tests/lexer_test.cpp
-    tests/parser_test.cpp
-    tests/page_test.cpp
-    tests/row_test.cpp
-    tests/catalog_test.cpp
-    tests/buffer_pool_test.cpp
-)
+file(GLOB TEST_SOURCES CONFIGURE_DEPENDS tests/*.cpp)
 
 add_library(microsql_lib ${SOURCES})
 target_include_directories(microsql_lib PUBLIC src)

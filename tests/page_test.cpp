@@ -21,19 +21,23 @@ TEST_CASE("init sets clean state") {
   CHECK(p.freeSpace() == PAGE_SIZE - HEADER_SIZE);
 }
 
-TEST_CASE("insertRow returns slot index and updates numSlots") {
+TEST_CASE("insertRow updates numSlots and stores row data") {
   Page p = makePage();
   auto row = makeRow(16);
-  auto slot = p.insertRow(row.data(), row.size());
-  REQUIRE(slot.has_value());
-  CHECK(*slot == 0);
+  REQUIRE(p.insertRow(row.data(), row.size()).has_value());
   CHECK(p.numSlots() == 1);
+  uint16_t len0 = 0;
+  auto read0 = p.readRow(0, &len0);
+  REQUIRE(read0.has_value());
+  CHECK(std::memcmp(*read0, row.data(), 16) == 0);
 
   auto row2 = makeRow(8, 0xCD);
-  auto slot2 = p.insertRow(row2.data(), row2.size());
-  REQUIRE(slot2.has_value());
-  CHECK(*slot2 == 1);
+  REQUIRE(p.insertRow(row2.data(), row2.size()).has_value());
   CHECK(p.numSlots() == 2);
+  uint16_t len1 = 0;
+  auto read1 = p.readRow(1, &len1);
+  REQUIRE(read1.has_value());
+  CHECK(std::memcmp(*read1, row2.data(), 8) == 0);
 }
 
 TEST_CASE("insertRow reduces freeSpace by rowLen + SLOT_ENTRY_SIZE") {
@@ -96,14 +100,12 @@ TEST_CASE("readRow returns SlotDeleted for deleted slot") {
   CHECK(p.readRow(0, &len).error() == PageError::SlotDeleted);
 }
 
-TEST_CASE("deleteRow marks slot deleted and returns data pointer") {
+TEST_CASE("deleteRow marks slot as deleted") {
   Page p = makePage();
   auto row = makeRow(12, 0x55);
   REQUIRE(p.insertRow(row.data(), row.size()).has_value());
 
-  auto result = p.deleteRow(0);
-  REQUIRE(result.has_value());
-  CHECK(std::memcmp(*result, row.data(), 12) == 0);
+  REQUIRE(p.deleteRow(0).has_value());
   CHECK(p.slotDeleted(0) == true);
 }
 
@@ -162,9 +164,12 @@ TEST_CASE(
   REQUIRE(p.updateRow(0, bigger.data(), bigger.size()).has_value());
 
   auto newRow = makeRow(8, 0xCC);
-  auto slot = p.insertRow(newRow.data(), newRow.size());
-  REQUIRE(slot.has_value());
-  CHECK(*slot == 1);
+  REQUIRE(p.insertRow(newRow.data(), newRow.size()).has_value());
+
+  uint16_t newLen = 0;
+  auto newRead = p.readRow(1, &newLen);
+  REQUIRE(newRead.has_value());
+  CHECK(std::memcmp(*newRead, newRow.data(), 8) == 0);
 
   uint16_t len = 0;
   auto read = p.readRow(0, &len);

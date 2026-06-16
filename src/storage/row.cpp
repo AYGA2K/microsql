@@ -6,8 +6,9 @@
 #include <expected>
 #include <string>
 
-std::expected<void, RowError> serializeRow(const Row &row, const Schema &schema,
-                                           uint8_t *output) {
+std::expected<uint8_t *, RowError> serializeRow(const Row &row,
+                                                const Schema &schema) {
+  uint8_t *output = new uint8_t[rowSize(schema)];
   if (row.size() != schema.size()) {
     return std::unexpected(RowError::SchemaMismatch);
   }
