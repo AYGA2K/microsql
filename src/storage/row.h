@@ -12,10 +12,10 @@ using Value = std::variant<int64_t, double, std::string, bool, std::nullptr_t>;
 using Row = std::vector<Value>;
 using Schema = std::vector<ColumnDefinition>;
 
-std::expected<uint8_t *, RowError> serializeRow(const Row &row,
-                                                const Schema &schema);
+std::expected<std::vector<uint8_t>, RowError> serializeRow(const Row &row,
+                                                           const Schema &schema);
 
 std::expected<Row, RowError> deserializeRow(const uint8_t *data,
                                             const Schema &schema);
 
-size_t rowSize(const Schema &schema);
+uint16_t rowSize(const Schema &schema);

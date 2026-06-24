@@ -122,77 +122,85 @@ std::expected<Result, ExecError> execInsert(const ParseResult &parseResult,
     return std::unexpected(ExecError::TableFileNotFound);
   }
 
-  Result result;
-  // INSERT INTO t VALUES (...) — no explicit column list
-  if (parseResult.statement.insertColumnNames.empty()) {
-    auto row = rowFromInsertValues(parseResult);
-    if (!row) {
+  auto row = rowFromInsertValues(parseResult, tableSchema->columns);
+  if (!row) {
+    std::println(
+        stderr,
+        "[Executor] failed to get row from insert values for table '{}'",
+        parseResult.statement.tableName);
+    return std::unexpected(row.error());
+  }
+
+  if (parseResult.statement.insertColumnNames.empty() &&
+      row.value().size() != tableSchema->columns.size()) {
+    std::println(stderr,
+                 "[Executor] column count mismatch on insert for table '{}': "
+                 "expected {}, got {}",
+                 parseResult.statement.tableName, tableSchema->columns.size(),
+                 row.value().size());
+    return std::unexpected(ExecError::ColumnCountMismatch);
+  }
+
+  auto rowBytes = serializeRow(row.value(), tableSchema->columns);
+  if (!rowBytes) {
+    std::println(
+        stderr, "[Executor] failed to serialize row for table '{}': {}",
+        parseResult.statement.tableName, rowErrorStr(rowBytes.error()));
+    return std::unexpected(ExecError::ErrorSerializeRow);
+  }
+
+  auto numPages = tableFile->numPages();
+  if (!numPages) {
+    std::println(
+        stderr, "[Executor] failed to get number of pages for table '{}': {}",
+        parseResult.statement.tableName, tableFileErrorStr(numPages.error()));
+    return std::unexpected(ExecError::ErrorGettingNumberOfPages);
+  }
+
+  uint16_t rowsize = rowSize(tableSchema->columns);
+  size_t i = 1;
+  while (i < numPages.value()) {
+    auto page = tableFile->readPage(i);
+    if (!page) {
       std::println(
-          stderr,
-          "[Executor] failed to get row from insert values for table '{}'",
-          parseResult.statement.tableName);
-      return std::unexpected(ExecError::GettingRowFromInsertValues);
+          stderr, "[Executor] failed to read page {} of table '{}': {}", i,
+          parseResult.statement.tableName, tableFileErrorStr(page.error()));
+      return std::unexpected(ExecError::ErrorReadingPage);
     }
-    auto rowBytes = serializeRow(row.value(), tableSchema->columns);
-    if (!rowBytes) {
-      std::println(
-          stderr, "[Executor] failed to serialize row for table '{}': {}",
-          parseResult.statement.tableName, rowErrorStr(rowBytes.error()));
-      return std::unexpected(ExecError::ErrorSerializeRow);
-    }
-    auto numPages = tableFile->numPages();
-    if (!numPages) {
-      std::println(
-          stderr, "[Executor] failed to get number of pages for table '{}': {}",
-          parseResult.statement.tableName, tableFileErrorStr(numPages.error()));
-      return std::unexpected(ExecError::ErrorGettingNumberOfPages);
-    }
-    size_t rowsize = rowSize(tableSchema->columns);
-    size_t i = 1;
-    for (i = 1; i < numPages.value(); i++) {
-      auto page = tableFile->readPage(i);
-      if (!page) {
-        std::println(
-            stderr, "[Executor] failed to read page {} of table '{}': {}", i,
-            parseResult.statement.tableName, tableFileErrorStr(page.error()));
-        return std::unexpected(ExecError::ErrorReadingPage);
-      }
-      // Check if there is enough space to insert a row in this page
-      if (page.value()->freeSpace() >= rowsize) {
-        auto ok = insertRowIntoPage(page.value(), rowBytes.value(), rowsize,
-                                    tableFile, parseResult.statement.tableName);
-        if (!ok) {
-          return std::unexpected(ok.error());
-        }
-        break;
-      }
-    }
-    // No existing page had room => allocate a new one
-    if (i == numPages.value()) {
-      auto pageId = tableFile->allocatePage();
-      if (!pageId) {
-        std::println(
-            stderr, "[Executor] failed to allocate page for table '{}': {}",
-            parseResult.statement.tableName, tableFileErrorStr(pageId.error()));
-        return std::unexpected(ExecError::ErrorInsertingRow);
-      }
-      auto page = tableFile->readPage(pageId.value());
-      if (!page) {
-        std::println(stderr,
-                     "[Executor] failed to read page {} of table '{}': {}",
-                     pageId.value(), parseResult.statement.tableName,
-                     tableFileErrorStr(page.error()));
-        return std::unexpected(ExecError::ErrorReadingPage);
-      }
-      auto ok = insertRowIntoPage(page.value(), rowBytes.value(), rowsize,
+    if (page.value()->freeSpace() >= rowsize) {
+      auto ok = insertRowIntoPage(page.value(), rowBytes.value().data(), rowsize,
                                   tableFile, parseResult.statement.tableName);
       if (!ok) {
         return std::unexpected(ok.error());
       }
+      break;
     }
-    return result;
+    i++;
   }
-  return std::unexpected(ExecError::NotImplemented);
+  // No existing page had enough free space => allocate a new one
+  if (i == numPages.value()) {
+    auto pageId = tableFile->allocatePage();
+    if (!pageId) {
+      std::println(
+          stderr, "[Executor] failed to allocate page for table '{}': {}",
+          parseResult.statement.tableName, tableFileErrorStr(pageId.error()));
+      return std::unexpected(ExecError::ErrorInsertingRow);
+    }
+    auto page = tableFile->readPage(pageId.value());
+    if (!page) {
+      std::println(stderr,
+                   "[Executor] failed to read page {} of table '{}': {}",
+                   pageId.value(), parseResult.statement.tableName,
+                   tableFileErrorStr(page.error()));
+      return std::unexpected(ExecError::ErrorReadingPage);
+    }
+    auto ok = insertRowIntoPage(page.value(), rowBytes.value().data(), rowsize,
+                                tableFile, parseResult.statement.tableName);
+    if (!ok) {
+      return std::unexpected(ok.error());
+    }
+  }
+  return Result{};
 }
 
 std::expected<Result, ExecError> execute(const ParseResult &parseResult,
@@ -201,6 +209,7 @@ std::expected<Result, ExecError> execute(const ParseResult &parseResult,
   case StatementKind::SELECT:
     return execSelect(parseResult, ctx);
   case StatementKind::INSERT:
+    return execInsert(parseResult, ctx);
   case StatementKind::UPDATE:
   case StatementKind::DELETE:
   case StatementKind::CREATE_TABLE:

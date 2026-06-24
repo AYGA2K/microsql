@@ -20,6 +20,8 @@ enum class ExecError {
   DivisionByZero,
   InvalidExpression,
   GettingRowFromInsertValues,
+  ColumnCountMismatch,
+  NotNullViolation,
   NotImplemented
 };
 

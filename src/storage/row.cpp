@@ -6,44 +6,45 @@
 #include <expected>
 #include <string>
 
-std::expected<uint8_t *, RowError> serializeRow(const Row &row,
-                                                const Schema &schema) {
-  uint8_t *output = new uint8_t[rowSize(schema)];
+std::expected<std::vector<uint8_t>, RowError> serializeRow(const Row &row,
+                                                           const Schema &schema) {
   if (row.size() != schema.size()) {
     return std::unexpected(RowError::SchemaMismatch);
   }
+  std::vector<uint8_t> output(rowSize(schema));
+  size_t offset = 0;
   for (size_t i = 0; i < row.size(); ++i) {
     const Value &value = row[i];
     switch (schema[i].type) {
     case DataType::BOOLEAN: {
       bool v = std::get<bool>(value);
-      std::memcpy(output, &v, schema[i].size());
-      output += schema[i].size();
+      std::memcpy(output.data() + offset, &v, schema[i].size());
+      offset += schema[i].size();
       break;
     }
     case DataType::INTEGER: {
       int64_t v = std::get<int64_t>(value);
-      std::memcpy(output, &v, schema[i].size());
-      output += schema[i].size();
+      std::memcpy(output.data() + offset, &v, schema[i].size());
+      offset += schema[i].size();
       break;
     }
     case DataType::FLOAT: {
       double v = std::get<double>(value);
-      std::memcpy(output, &v, schema[i].size());
-      output += schema[i].size();
+      std::memcpy(output.data() + offset, &v, schema[i].size());
+      offset += schema[i].size();
       break;
     }
     case DataType::TEXT: {
       const std::string &v = std::get<std::string>(value);
-      std::memcpy(output, v.data(), schema[i].size());
-      output += schema[i].size();
+      std::memcpy(output.data() + offset, v.data(), schema[i].size());
+      offset += schema[i].size();
       break;
     }
     default:
       return std::unexpected(RowError::DataTypeNotSupported);
     }
   }
-  return {};
+  return output;
 }
 
 std::expected<Row, RowError> deserializeRow(const uint8_t *data,
@@ -86,4 +87,12 @@ std::expected<Row, RowError> deserializeRow(const uint8_t *data,
   }
 
   return row;
+}
+
+uint16_t rowSize(const Schema &schema) {
+  uint16_t size = 0;
+  for (const ColumnDefinition &col : schema) {
+    size += col.size();
+  }
+  return size;
 }

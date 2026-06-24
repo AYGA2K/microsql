@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ast/expression.h"
+#include "ast/statement.h"
 #include "executor.h"
 #include "parser/parser.h"
 #include "storage/page.h"
@@ -23,12 +24,13 @@ std::expected<int, ExecError> compareValues(const Value &leftValue,
                                             const Value &rightValue);
 
 std::expected<Value, ExecError>
-evalExpr(const Expression &expr, const ParseResult &parseResult,
-         const Row &row, const std::vector<std::string> &columns);
+evalExpr(const Expression &expr, const ParseResult &parseResult, const Row &row,
+         const std::vector<std::string> &columns);
 
 std::expected<bool, ExecError>
 evalWhere(const Expression &expr, const ParseResult &parseResult,
           const Row &row, const std::vector<std::string> &columns);
 
 std::expected<Row, ExecError>
-rowFromInsertValues(const ParseResult &parseResult);
+rowFromInsertValues(const ParseResult &parseResult,
+                    std::vector<ColumnDefinition> columns);

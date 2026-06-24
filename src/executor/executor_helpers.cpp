@@ -1,9 +1,12 @@
 #include "executor_helpers.h"
 #include "ast/expression.h"
+#include "ast/statement.h"
 #include "executor/executor.h"
 #include "parser/parser.h"
 #include "storage/page.h"
 #include "storage/row.h"
+#include <cstddef>
+#include <vector>
 
 const char *tableFileErrorStr(TableFileError error) {
   switch (error) {
@@ -215,15 +218,40 @@ evalExpr(const Expression &expr, const ParseResult &parseResult, const Row &row,
 }
 
 std::expected<Row, ExecError>
-rowFromInsertValues(const ParseResult &parseResult) {
+rowFromInsertValues(const ParseResult &parseResult,
+                    std::vector<ColumnDefinition> columns) {
   Row row;
-  for (int index : parseResult.statement.insertValues) {
-    auto value = evalExpr(parseResult.expressions[index], parseResult, {}, {});
-    if (!value) {
-      return std::unexpected(value.error());
+  if (parseResult.statement.insertColumnNames.empty()) {
+    for (int index : parseResult.statement.insertValues) {
+      auto value =
+          evalExpr(parseResult.expressions[index], parseResult, {}, {});
+      if (!value) {
+        return std::unexpected(value.error());
+      }
+      row.push_back(std::move(*value));
     }
-    row.push_back(std::move(*value));
+    return row;
   }
+  for (const ColumnDefinition &col : columns) {
+    const auto &columnNames = parseResult.statement.insertColumnNames;
+    auto it = std::find(columnNames.begin(), columnNames.end(), col.name);
+    if (it != columnNames.end()) {
+      size_t pos = it - columnNames.begin();
+      int exprIndex = parseResult.statement.insertValues[pos];
+      auto value =
+          evalExpr(parseResult.expressions[exprIndex], parseResult, {}, {});
+      if (!value) {
+        return std::unexpected(value.error());
+      }
+      row.push_back(std::move(*value));
+    } else {
+      if (col.notNull) {
+        return std::unexpected(ExecError::NotNullViolation);
+      }
+      row.push_back(nullptr);
+    }
+  }
+
   return row;
 }
 
