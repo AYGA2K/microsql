@@ -211,14 +211,21 @@ std::expected<uint32_t, TableFileError> TableFile::allocatePage() {
     return std::unexpected(TableFileError::FileNotOpen);
   }
 
+  auto pages = this->numPages();
+  if (!pages) {
+    return std::unexpected(pages.error());
+  }
+  uint32_t newPageId = static_cast<uint32_t>(pages.value());
+
   this->file.clear();
   this->file.seekp(0, std::ios::end);
   if (!this->file) {
     return std::unexpected(TableFileError::FailedToSeekPage);
   }
 
-  std::array<char, PAGE_SIZE> page{};
-  this->file.write(page.data(), PAGE_SIZE);
+  Page page{};
+  page.init(newPageId);
+  this->file.write(reinterpret_cast<const char *>(page.data), PAGE_SIZE);
   if (!this->file) {
     return std::unexpected(TableFileError::FailedToWritePage);
   }
@@ -228,10 +235,5 @@ std::expected<uint32_t, TableFileError> TableFile::allocatePage() {
     return std::unexpected(TableFileError::FailedToWritePage);
   }
 
-  auto pages = this->numPages();
-  if (!pages) {
-    return std::unexpected(pages.error());
-  }
-
-  return static_cast<uint32_t>(pages.value() - 1);
+  return newPageId;
 }

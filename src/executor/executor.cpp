@@ -55,30 +55,42 @@ std::expected<Result, ExecError> execSelect(const ParseResult &parseResult,
       return std::unexpected(ExecError::ErrorReadingPage);
     }
 
-    auto row = deserializeRow(page.value()->data, tableSchema->columns);
-    if (!row) {
-      std::println(
-          stderr,
-          "[Executor] failed to deserialize row from page {} of table '{}'", i,
-          parseResult.statement.tableName);
-      return std::unexpected(ExecError::ErrorDeserializeRow);
-    }
-
-    // whereIndex == -1 means no WHERE clause; include every row
-    if (whereIndex == -1) {
-      result.rows.push_back(row.value());
-    } else {
-      auto match = evalWhere(parseResult.expressions[whereIndex], parseResult,
-                             row.value(), result.columns);
-      if (!match) {
-        std::println(stderr,
-                     "[Executor] failed to evaluate WHERE clause on page {} of "
-                     "table '{}'",
-                     i, parseResult.statement.tableName);
-        return std::unexpected(match.error());
+    uint16_t numSlots = page.value()->numSlots();
+    for (uint16_t slot = 0; slot < numSlots; slot++) {
+      if (page.value()->slotDeleted(slot)) {
+        continue;
       }
-      if (match.value()) {
+      uint16_t rowLen;
+      auto rowData = page.value()->readRow(slot, &rowLen);
+      if (!rowData) {
+        std::println(stderr,
+                     "[Executor] failed to read slot {} on page {} of table '{}'",
+                     slot, i, parseResult.statement.tableName);
+        return std::unexpected(ExecError::ErrorReadingPage);
+      }
+      auto row = deserializeRow(rowData.value(), tableSchema->columns);
+      if (!row) {
+        std::println(stderr,
+                     "[Executor] failed to deserialize row from slot {} on page "
+                     "{} of table '{}'",
+                     slot, i, parseResult.statement.tableName);
+        return std::unexpected(ExecError::ErrorDeserializeRow);
+      }
+      if (whereIndex == -1) {
         result.rows.push_back(row.value());
+      } else {
+        auto match = evalWhere(parseResult.expressions[whereIndex], parseResult,
+                               row.value(), result.columns);
+        if (!match) {
+          std::println(stderr,
+                       "[Executor] failed to evaluate WHERE clause on slot {} "
+                       "of page {} of table '{}'",
+                       slot, i, parseResult.statement.tableName);
+          return std::unexpected(match.error());
+        }
+        if (match.value()) {
+          result.rows.push_back(row.value());
+        }
       }
     }
   }
