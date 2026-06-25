@@ -16,6 +16,7 @@ enum class ExecError {
   ErrorSerializeRow,
   ErrorGettingData,
   ErrorInsertingRow,
+  ErrorUpdatingRow,
   ErrorDeletingRow,
   TypeMismatch,
   DivisionByZero,

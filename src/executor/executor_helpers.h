@@ -15,7 +15,7 @@ const char *pageErrorStr(PageError error);
 const char *rowErrorStr(RowError error);
 const char *execErrorStr(ExecError error);
 
-size_t indexOf(const std::vector<std::string> &vec, const std::string &value);
+int indexOf(const std::vector<std::string> &vec, const std::string &value);
 
 std::expected<Value, ExecError>
 columnValue(const Row &row, const std::vector<std::string> &columns,
@@ -35,3 +35,9 @@ evalWhere(const Expression &expr, const ParseResult &parseResult,
 std::expected<Row, ExecError>
 rowFromInsertValues(const ParseResult &parseResult,
                     std::vector<ColumnDefinition> columns);
+
+std::expected<Row, ExecError>
+rowFromUpdate(const Row &row,
+              const std::vector<std::pair<std::string, int>> &assignments,
+              const ParseResult &parseResult,
+              const std::vector<std::string> &columnNames);

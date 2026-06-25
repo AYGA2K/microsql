@@ -311,6 +311,91 @@ static std::expected<int, ExecError> execDelete(const ParseResult &parseResult,
   return deletedCount;
 }
 
+static std::expected<int, ExecError> execUpdate(const ParseResult &parseResult,
+                                                ExecutionContext &ctx) {
+  auto resolved = resolveTable(parseResult.statement.tableName, ctx);
+  if (!resolved) {
+    return std::unexpected(resolved.error());
+  }
+  auto [schema, file] = resolved.value();
+
+  auto numPages = getNumPages(file, parseResult.statement.tableName);
+  if (!numPages) {
+    return std::unexpected(numPages.error());
+  }
+
+  int updatedCount = 0;
+  int whereIndex = parseResult.statement.whereIndex;
+  size_t pageIndex = 1;
+  while (pageIndex < numPages.value()) {
+    auto page = readPage(file, pageIndex, parseResult.statement.tableName);
+    if (!page) {
+      return std::unexpected(page.error());
+    }
+
+    uint16_t numSlots = page.value()->numSlots();
+    for (uint16_t slot = 0; slot < numSlots; slot++) {
+      if (page.value()->slotDeleted(slot)) {
+        continue;
+      }
+      auto row = readSlotRow(page.value(), slot, pageIndex,
+                             parseResult.statement.tableName, schema->columns);
+      if (!row) {
+        return std::unexpected(row.error());
+      }
+      bool shouldUpdate = whereIndex == -1;
+      if (!shouldUpdate) {
+        auto match = evalWhere(parseResult.expressions[whereIndex], parseResult,
+                               row.value(), schema->columnNames());
+        if (!match) {
+          std::println(stderr,
+                       "[Executor] failed to evaluate WHERE clause on slot {} "
+                       "of page {} of table '{}'",
+                       slot, pageIndex, parseResult.statement.tableName);
+          return std::unexpected(match.error());
+        }
+        shouldUpdate = match.value();
+      }
+      if (shouldUpdate) {
+        auto updated =
+            rowFromUpdate(row.value(), parseResult.statement.assignments,
+                          parseResult, schema->columnNames());
+        if (!updated) {
+          return std::unexpected(updated.error());
+        }
+        auto rowBytes = serializeRow(updated.value(), schema->columns);
+        if (!rowBytes) {
+          std::println(stderr,
+                       "[Executor] failed to serialize updated row for table '{}'",
+                       parseResult.statement.tableName);
+          return std::unexpected(ExecError::ErrorSerializeRow);
+        }
+        uint16_t rowSizeBytes = rowSize(schema->columns);
+        auto ok = page.value()->updateRow(slot, rowBytes.value().data(), rowSizeBytes);
+        if (!ok) {
+          std::println(stderr,
+                       "[Executor] failed to update slot {} on page {} of "
+                       "table '{}'",
+                       slot, pageIndex, parseResult.statement.tableName);
+          return std::unexpected(ExecError::ErrorUpdatingRow);
+        }
+        updatedCount++;
+      }
+    }
+    auto written = file->writePage(*page.value());
+    if (!written) {
+      std::println(stderr,
+                   "[Executor] failed to write page {} of table '{}': {}",
+                   pageIndex, parseResult.statement.tableName,
+                   tableFileErrorStr(written.error()));
+      return std::unexpected(ExecError::ErrorUpdatingRow);
+    }
+    pageIndex++;
+  }
+
+  return updatedCount;
+}
+
 static Result makeError(ExecError err) {
   return Result{.success = false, .message = execErrorStr(err), .columns = {}, .rows = {}};
 }
@@ -345,7 +430,17 @@ Result execute(const ParseResult &parseResult, ExecutionContext &ctx) {
                   .columns = {},
                   .rows = {}};
   }
-  case StatementKind::UPDATE:
+  case StatementKind::UPDATE: {
+    auto count = execUpdate(parseResult, ctx);
+    if (!count) {
+      return makeError(count.error());
+    }
+    int n = count.value();
+    return Result{.success = true,
+                  .message = std::format("{} row{} updated", n, n == 1 ? "" : "s"),
+                  .columns = {},
+                  .rows = {}};
+  }
   case StatementKind::CREATE_TABLE:
   case StatementKind::DROP_TABLE:
   case StatementKind::CREATE_INDEX:

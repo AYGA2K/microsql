@@ -76,6 +76,7 @@ const char *execErrorStr(ExecError error) {
   case ExecError::ErrorDeserializeRow:
   case ExecError::ErrorSerializeRow:
   case ExecError::ErrorInsertingRow:
+  case ExecError::ErrorUpdatingRow:
   case ExecError::ErrorDeletingRow:
   case ExecError::GettingRowFromInsertValues:
     return "internal error";
@@ -83,7 +84,7 @@ const char *execErrorStr(ExecError error) {
   return "internal error";
 }
 
-size_t indexOf(const std::vector<std::string> &vec, const std::string &value) {
+int indexOf(const std::vector<std::string> &vec, const std::string &value) {
   auto it = std::find(vec.begin(), vec.end(), value);
   if (it == vec.end()) {
     return -1;
@@ -106,7 +107,6 @@ std::expected<int, ExecError> compareValues(const Value &leftValue,
   if (leftValue.index() != rightValue.index()) {
     return std::unexpected(ExecError::TypeMismatch);
   }
-
   if (std::holds_alternative<int64_t>(leftValue)) {
     int64_t left = std::get<int64_t>(leftValue),
             right = std::get<int64_t>(rightValue);
@@ -244,10 +244,12 @@ evalExpr(const Expression &expr, const ParseResult &parseResult, const Row &row,
     case UnaryOperator::NOT:
       return flipBoolValue(*unaryExpr);
     }
+    return std::unexpected(ExecError::InvalidExpression);
   }
   case ExpressionKind::STAR:
     return std::unexpected(ExecError::InvalidExpression);
   }
+  return std::unexpected(ExecError::InvalidExpression);
 }
 
 std::expected<Row, ExecError>
@@ -284,8 +286,28 @@ rowFromInsertValues(const ParseResult &parseResult,
       row.push_back(nullptr);
     }
   }
-
   return row;
+}
+
+std::expected<Row, ExecError>
+rowFromUpdate(const Row &row,
+              const std::vector<std::pair<std::string, int>> &assignments,
+              const ParseResult &parseResult,
+              const std::vector<std::string> &columnNames) {
+  Row updated = row;
+  for (const auto &[colName, exprIndex] : assignments) {
+    int colIdx = indexOf(columnNames, colName);
+    if (colIdx == -1) {
+      return std::unexpected(ExecError::ErrorGettingData);
+    }
+    auto value = evalExpr(parseResult.expressions[exprIndex], parseResult, row,
+                          columnNames);
+    if (!value) {
+      return std::unexpected(value.error());
+    }
+    updated[colIdx] = std::move(*value);
+  }
+  return updated;
 }
 
 std::expected<bool, ExecError>
