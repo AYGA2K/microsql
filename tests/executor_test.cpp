@@ -140,6 +140,57 @@ static ParseResult makeDeleteWhere(const std::string &tableName,
   return pr;
 }
 
+static ParseResult makeUpdateAll(const std::string &tableName,
+                                 const std::string &setCol, int64_t setVal) {
+  ParseResult pr;
+  pr.statement.kind = StatementKind::UPDATE;
+  pr.statement.tableName = tableName;
+  pr.statement.whereIndex = -1;
+
+  Expression lit;
+  lit.kind = ExpressionKind::LITERAL_INT;
+  lit.intValue = setVal;
+  pr.expressions.push_back(lit);
+  pr.statement.assignments.push_back({setCol, 0});
+
+  return pr;
+}
+
+static ParseResult makeUpdateWhere(const std::string &tableName,
+                                   const std::string &setCol, int64_t setVal,
+                                   const std::string &whereCol,
+                                   int64_t whereVal) {
+  ParseResult pr;
+  pr.statement.kind = StatementKind::UPDATE;
+  pr.statement.tableName = tableName;
+
+  Expression setLit;
+  setLit.kind = ExpressionKind::LITERAL_INT;
+  setLit.intValue = setVal;
+  pr.expressions.push_back(setLit);       // index 0: SET value
+  pr.statement.assignments.push_back({setCol, 0});
+
+  Expression colRef;
+  colRef.kind = ExpressionKind::COLUMN_REF;
+  colRef.columnName = whereCol;
+  pr.expressions.push_back(colRef);       // index 1: WHERE column
+
+  Expression whereLit;
+  whereLit.kind = ExpressionKind::LITERAL_INT;
+  whereLit.intValue = whereVal;
+  pr.expressions.push_back(whereLit);     // index 2: WHERE value
+
+  Expression binary;
+  binary.kind = ExpressionKind::BINARY;
+  binary.binaryOperator = BinaryOperator::EQUAL;
+  binary.leftIndex = 1;
+  binary.rightIndex = 2;
+  pr.expressions.push_back(binary);       // index 3: WHERE clause
+  pr.statement.whereIndex = 3;
+
+  return pr;
+}
+
 TEST_CASE("execInsert fails for unknown table") {
   ExecutionContext ctx;
   auto result = execute(makeInsert("ghost", {1, 2}), ctx);
@@ -303,4 +354,61 @@ TEST_CASE("execDelete with WHERE that matches nothing deletes zero rows") {
   auto sel = execute(makeSelectAll("users"), tc.ctx);
   REQUIRE(sel.success);
   CHECK(sel.rows.size() == 1);
+}
+
+TEST_CASE("execUpdate fails for unknown table") {
+  ExecutionContext ctx;
+  auto result = execute(makeUpdateAll("ghost", "age", 99), ctx);
+  REQUIRE_FALSE(result.success);
+  CHECK(result.message == "table not found");
+}
+
+TEST_CASE("execUpdate without WHERE updates all rows") {
+  TestCtx tc("users", {makeCol("id", DataType::INTEGER), makeCol("age", DataType::INTEGER)});
+  REQUIRE(execute(makeInsert("users", {1, 20}), tc.ctx).success);
+  REQUIRE(execute(makeInsert("users", {2, 30}), tc.ctx).success);
+  REQUIRE(execute(makeInsert("users", {3, 40}), tc.ctx).success);
+
+  auto upd = execute(makeUpdateAll("users", "age", 99), tc.ctx);
+  REQUIRE(upd.success);
+  CHECK(upd.message == "3 rows updated");
+
+  auto sel = execute(makeSelectAll("users"), tc.ctx);
+  REQUIRE(sel.success);
+  REQUIRE(sel.rows.size() == 3);
+  CHECK(std::get<int64_t>(sel.rows[0][1]) == 99);
+  CHECK(std::get<int64_t>(sel.rows[1][1]) == 99);
+  CHECK(std::get<int64_t>(sel.rows[2][1]) == 99);
+}
+
+TEST_CASE("execUpdate with WHERE updates only matching rows") {
+  TestCtx tc("users", {makeCol("id", DataType::INTEGER), makeCol("age", DataType::INTEGER)});
+  REQUIRE(execute(makeInsert("users", {1, 20}), tc.ctx).success);
+  REQUIRE(execute(makeInsert("users", {2, 30}), tc.ctx).success);
+  REQUIRE(execute(makeInsert("users", {3, 40}), tc.ctx).success);
+
+  auto upd = execute(makeUpdateWhere("users", "age", 99, "id", 2), tc.ctx);
+  REQUIRE(upd.success);
+  CHECK(upd.message == "1 row updated");
+
+  auto sel = execute(makeSelectAll("users"), tc.ctx);
+  REQUIRE(sel.success);
+  REQUIRE(sel.rows.size() == 3);
+  CHECK(std::get<int64_t>(sel.rows[0][1]) == 20);
+  CHECK(std::get<int64_t>(sel.rows[1][1]) == 99);
+  CHECK(std::get<int64_t>(sel.rows[2][1]) == 40);
+}
+
+TEST_CASE("execUpdate with WHERE that matches nothing updates zero rows") {
+  TestCtx tc("users", {makeCol("id", DataType::INTEGER), makeCol("age", DataType::INTEGER)});
+  REQUIRE(execute(makeInsert("users", {1, 20}), tc.ctx).success);
+
+  auto upd = execute(makeUpdateWhere("users", "age", 99, "id", 42), tc.ctx);
+  REQUIRE(upd.success);
+  CHECK(upd.message == "0 rows updated");
+
+  auto sel = execute(makeSelectAll("users"), tc.ctx);
+  REQUIRE(sel.success);
+  REQUIRE(sel.rows.size() == 1);
+  CHECK(std::get<int64_t>(sel.rows[0][1]) == 20);
 }
