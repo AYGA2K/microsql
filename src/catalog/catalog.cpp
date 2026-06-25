@@ -44,7 +44,9 @@ std::expected<void, CatalogError> Catalog::load(const std::string &directory) {
       TableSchema tableSchema;
       auto words = split(line);
       if (words.size() != 2) {
-        std::println(stderr, "[Catalog] invalid TABLE line {}: '{}'", lineNum, line);
+        std::println(stderr,
+                     "[Catalog] line {}: expected 'TABLE <name>', got '{}' ({} token{})",
+                     lineNum, line, words.size(), words.size() == 1 ? "" : "s");
         return std::unexpected(CatalogError::UnvalidTableLineFormat);
       }
       tableSchema.tableName = words[1];
@@ -53,8 +55,11 @@ std::expected<void, CatalogError> Catalog::load(const std::string &directory) {
         if (line.starts_with("COLUMN")) {
           words = split(line);
           if (words.size() != 6) {
-            std::println(stderr, "[Catalog] invalid COLUMN line {} in table '{}': '{}'",
-                         lineNum, tableSchema.tableName, line);
+            std::println(stderr,
+                         "[Catalog] line {} in table '{}': expected 'COLUMN <name> <type> "
+                         "<textLength> <notNull> <primaryKey>', got '{}' ({} token{})",
+                         lineNum, tableSchema.tableName, line, words.size(),
+                         words.size() == 1 ? "" : "s");
             return std::unexpected(CatalogError::UnvalidColumnLineFormat);
           }
           ColumnDefinition column;

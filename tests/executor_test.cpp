@@ -105,6 +105,41 @@ static ParseResult makeSelectWhere(const std::string &tableName,
   return pr;
 }
 
+static ParseResult makeDeleteAll(const std::string &tableName) {
+  ParseResult pr;
+  pr.statement.kind = StatementKind::DELETE;
+  pr.statement.tableName = tableName;
+  pr.statement.whereIndex = -1;
+  return pr;
+}
+
+static ParseResult makeDeleteWhere(const std::string &tableName,
+                                   const std::string &col, int64_t val) {
+  ParseResult pr;
+  pr.statement.kind = StatementKind::DELETE;
+  pr.statement.tableName = tableName;
+  pr.statement.whereIndex = 2;
+
+  Expression colRef;
+  colRef.kind = ExpressionKind::COLUMN_REF;
+  colRef.columnName = col;
+  pr.expressions.push_back(colRef);
+
+  Expression lit;
+  lit.kind = ExpressionKind::LITERAL_INT;
+  lit.intValue = val;
+  pr.expressions.push_back(lit);
+
+  Expression binary;
+  binary.kind = ExpressionKind::BINARY;
+  binary.binaryOperator = BinaryOperator::EQUAL;
+  binary.leftIndex = 0;
+  binary.rightIndex = 1;
+  pr.expressions.push_back(binary);
+
+  return pr;
+}
+
 TEST_CASE("execInsert fails for unknown table") {
   ExecutionContext ctx;
   auto result = execute(makeInsert("ghost", {1, 2}), ctx);
@@ -216,4 +251,56 @@ TEST_CASE("execSelect with WHERE returns empty when no rows match") {
   auto result = execute(makeSelectWhere("users", "id", 99), tc.ctx);
   REQUIRE(result.success);
   CHECK(result.rows.empty());
+}
+
+TEST_CASE("execDelete fails for unknown table") {
+  ExecutionContext ctx;
+  auto result = execute(makeDeleteAll("ghost"), ctx);
+  REQUIRE_FALSE(result.success);
+  CHECK(result.message == "table not found");
+}
+
+TEST_CASE("execDelete without WHERE removes all rows") {
+  TestCtx tc("users", {makeCol("id", DataType::INTEGER), makeCol("age", DataType::INTEGER)});
+  REQUIRE(execute(makeInsert("users", {1, 20}), tc.ctx).success);
+  REQUIRE(execute(makeInsert("users", {2, 30}), tc.ctx).success);
+  REQUIRE(execute(makeInsert("users", {3, 40}), tc.ctx).success);
+
+  auto del = execute(makeDeleteAll("users"), tc.ctx);
+  REQUIRE(del.success);
+  CHECK(del.message == "3 rows deleted");
+
+  auto sel = execute(makeSelectAll("users"), tc.ctx);
+  REQUIRE(sel.success);
+  CHECK(sel.rows.empty());
+}
+
+TEST_CASE("execDelete with WHERE removes only matching rows") {
+  TestCtx tc("users", {makeCol("id", DataType::INTEGER), makeCol("age", DataType::INTEGER)});
+  REQUIRE(execute(makeInsert("users", {1, 20}), tc.ctx).success);
+  REQUIRE(execute(makeInsert("users", {2, 30}), tc.ctx).success);
+  REQUIRE(execute(makeInsert("users", {3, 40}), tc.ctx).success);
+
+  auto del = execute(makeDeleteWhere("users", "id", 2), tc.ctx);
+  REQUIRE(del.success);
+  CHECK(del.message == "1 row deleted");
+
+  auto sel = execute(makeSelectAll("users"), tc.ctx);
+  REQUIRE(sel.success);
+  REQUIRE(sel.rows.size() == 2);
+  CHECK(std::get<int64_t>(sel.rows[0][0]) == 1);
+  CHECK(std::get<int64_t>(sel.rows[1][0]) == 3);
+}
+
+TEST_CASE("execDelete with WHERE that matches nothing deletes zero rows") {
+  TestCtx tc("users", {makeCol("id", DataType::INTEGER), makeCol("age", DataType::INTEGER)});
+  REQUIRE(execute(makeInsert("users", {1, 20}), tc.ctx).success);
+
+  auto del = execute(makeDeleteWhere("users", "id", 99), tc.ctx);
+  REQUIRE(del.success);
+  CHECK(del.message == "0 rows deleted");
+
+  auto sel = execute(makeSelectAll("users"), tc.ctx);
+  REQUIRE(sel.success);
+  CHECK(sel.rows.size() == 1);
 }
