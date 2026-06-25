@@ -13,4 +13,5 @@ struct TableSchema {
   size_t rowSize();
   uint16_t columnOffset(int index);
   int column_index(const std::string &name);
+  std::vector<std::string> columnNames();
 };

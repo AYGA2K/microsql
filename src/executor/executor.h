@@ -16,6 +16,7 @@ enum class ExecError {
   ErrorSerializeRow,
   ErrorGettingData,
   ErrorInsertingRow,
+  ErrorDeletingRow,
   TypeMismatch,
   DivisionByZero,
   InvalidExpression,
@@ -26,6 +27,8 @@ enum class ExecError {
 };
 
 struct Result {
+  bool success = true;
+  std::string message;
   std::vector<std::string> columns;
   std::vector<Row> rows;
 };
@@ -36,5 +39,4 @@ struct ExecutionContext {
   std::unordered_map<std::string, TableFile *> openFiles;
 };
 
-std::expected<Result, ExecError> execute(const ParseResult &parseResult,
-                                         ExecutionContext &ctx);
+Result execute(const ParseResult &parseResult, ExecutionContext &ctx);

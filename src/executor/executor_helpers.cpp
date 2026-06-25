@@ -50,6 +50,39 @@ const char *rowErrorStr(RowError error) {
   return "Unknown";
 }
 
+const char *execErrorStr(ExecError error) {
+  switch (error) {
+  // user-facing errors
+  case ExecError::TableSchemaNotFound:
+    return "table not found";
+  case ExecError::ErrorGettingData:
+    return "column not found";
+  case ExecError::TypeMismatch:
+    return "type mismatch";
+  case ExecError::DivisionByZero:
+    return "division by zero";
+  case ExecError::InvalidExpression:
+    return "invalid expression";
+  case ExecError::ColumnCountMismatch:
+    return "column count mismatch";
+  case ExecError::NotNullViolation:
+    return "NOT NULL constraint violated";
+  case ExecError::NotImplemented:
+    return "not implemented";
+  // internal errors — details already logged to stderr
+  case ExecError::TableFileNotFound:
+  case ExecError::ErrorGettingNumberOfPages:
+  case ExecError::ErrorReadingPage:
+  case ExecError::ErrorDeserializeRow:
+  case ExecError::ErrorSerializeRow:
+  case ExecError::ErrorInsertingRow:
+  case ExecError::ErrorDeletingRow:
+  case ExecError::GettingRowFromInsertValues:
+    return "internal error";
+  }
+  return "internal error";
+}
+
 size_t indexOf(const std::vector<std::string> &vec, const std::string &value) {
   auto it = std::find(vec.begin(), vec.end(), value);
   if (it == vec.end()) {

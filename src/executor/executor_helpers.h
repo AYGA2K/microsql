@@ -13,6 +13,7 @@
 const char *tableFileErrorStr(TableFileError error);
 const char *pageErrorStr(PageError error);
 const char *rowErrorStr(RowError error);
+const char *execErrorStr(ExecError error);
 
 size_t indexOf(const std::vector<std::string> &vec, const std::string &value);
 

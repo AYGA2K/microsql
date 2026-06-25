@@ -26,3 +26,11 @@ int TableSchema::column_index(const std::string &name) {
   }
   return -1;
 }
+
+std::vector<std::string> TableSchema::columnNames() {
+  std::vector<std::string> names;
+  for (auto const &column : this->columns) {
+    names.push_back(column.name);
+  }
+  return names;
+}

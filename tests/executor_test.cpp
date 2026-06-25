@@ -105,21 +105,21 @@ static ParseResult makeSelectWhere(const std::string &tableName,
   return pr;
 }
 
-TEST_CASE("execInsert returns TableSchemaNotFound for unknown table") {
+TEST_CASE("execInsert fails for unknown table") {
   ExecutionContext ctx;
   auto result = execute(makeInsert("ghost", {1, 2}), ctx);
-  REQUIRE_FALSE(result.has_value());
-  CHECK(result.error() == ExecError::TableSchemaNotFound);
+  REQUIRE_FALSE(result.success);
+  CHECK(result.message == "table not found");
 }
 
-TEST_CASE("execInsert returns ColumnCountMismatch when value count differs from schema") {
+TEST_CASE("execInsert fails when value count differs from schema") {
   TestCtx tc("users", {makeCol("id", DataType::INTEGER), makeCol("age", DataType::INTEGER)});
   auto result = execute(makeInsert("users", {42}), tc.ctx);
-  REQUIRE_FALSE(result.has_value());
-  CHECK(result.error() == ExecError::ColumnCountMismatch);
+  REQUIRE_FALSE(result.success);
+  CHECK(result.message == "column count mismatch");
 }
 
-TEST_CASE("execInsert returns NotNullViolation when explicit columns omit a NOT NULL column") {
+TEST_CASE("execInsert fails when explicit columns omit a NOT NULL column") {
   TestCtx tc("users", {makeCol("id", DataType::INTEGER, 0, true),
                         makeCol("age", DataType::INTEGER)});
   ParseResult pr;
@@ -134,15 +134,15 @@ TEST_CASE("execInsert returns NotNullViolation when explicit columns omit a NOT 
   pr.statement.insertValues = {0};
 
   auto result = execute(pr, tc.ctx);
-  REQUIRE_FALSE(result.has_value());
-  CHECK(result.error() == ExecError::NotNullViolation);
+  REQUIRE_FALSE(result.success);
+  CHECK(result.message == "NOT NULL constraint violated");
 }
 
-TEST_CASE("execInsert succeeds and returns empty result") {
+TEST_CASE("execInsert succeeds with message") {
   TestCtx tc("users", {makeCol("id", DataType::INTEGER), makeCol("age", DataType::INTEGER)});
   auto result = execute(makeInsert("users", {1, 25}), tc.ctx);
-  REQUIRE(result.has_value());
-  CHECK(result.value().rows.empty());
+  REQUIRE(result.success);
+  CHECK(result.message == "1 row inserted");
 }
 
 TEST_CASE("execInsert fills a page and allocates a new one") {
@@ -152,7 +152,7 @@ TEST_CASE("execInsert fills a page and allocates a new one") {
 
   int rowsPerPage = (PAGE_SIZE - HEADER_SIZE) / (8 + 8 + SLOT_ENTRY_SIZE);
   for (int i = 0; i < rowsPerPage + 1; i++) {
-    REQUIRE(execute(makeInsert("users", {i, i * 2}), tc.ctx).has_value());
+    REQUIRE(execute(makeInsert("users", {i, i * 2}), tc.ctx).success);
   }
 
   auto numAfter = tc.tf->numPages();
@@ -160,59 +160,60 @@ TEST_CASE("execInsert fills a page and allocates a new one") {
   CHECK(numAfter.value() > numBefore.value() + 1);
 }
 
-TEST_CASE("execSelect returns TableSchemaNotFound for unknown table") {
+TEST_CASE("execSelect fails for unknown table") {
   ExecutionContext ctx;
   auto result = execute(makeSelectAll("ghost"), ctx);
-  REQUIRE_FALSE(result.has_value());
-  CHECK(result.error() == ExecError::TableSchemaNotFound);
+  REQUIRE_FALSE(result.success);
+  CHECK(result.message == "table not found");
 }
 
 TEST_CASE("execSelect on empty table returns no rows with correct columns") {
   TestCtx tc("users", {makeCol("id", DataType::INTEGER), makeCol("age", DataType::INTEGER)});
   auto result = execute(makeSelectAll("users"), tc.ctx);
-  REQUIRE(result.has_value());
-  CHECK(result.value().rows.empty());
-  CHECK(result.value().columns == std::vector<std::string>{"id", "age"});
+  REQUIRE(result.success);
+  CHECK(result.rows.empty());
+  CHECK(result.columns == std::vector<std::string>{"id", "age"});
 }
 
 TEST_CASE("execSelect returns row after insert") {
   TestCtx tc("users", {makeCol("id", DataType::INTEGER), makeCol("age", DataType::INTEGER)});
-  REQUIRE(execute(makeInsert("users", {42, 25}), tc.ctx).has_value());
+  REQUIRE(execute(makeInsert("users", {42, 25}), tc.ctx).success);
 
   auto result = execute(makeSelectAll("users"), tc.ctx);
-  REQUIRE(result.has_value());
-  REQUIRE(result.value().rows.size() == 1);
-  CHECK(std::get<int64_t>(result.value().rows[0][0]) == 42);
-  CHECK(std::get<int64_t>(result.value().rows[0][1]) == 25);
+  REQUIRE(result.success);
+  REQUIRE(result.rows.size() == 1);
+  CHECK(std::get<int64_t>(result.rows[0][0]) == 42);
+  CHECK(std::get<int64_t>(result.rows[0][1]) == 25);
 }
 
 TEST_CASE("execSelect returns all inserted rows") {
   TestCtx tc("users", {makeCol("id", DataType::INTEGER), makeCol("age", DataType::INTEGER)});
-  REQUIRE(execute(makeInsert("users", {1, 20}), tc.ctx).has_value());
-  REQUIRE(execute(makeInsert("users", {2, 30}), tc.ctx).has_value());
-  REQUIRE(execute(makeInsert("users", {3, 40}), tc.ctx).has_value());
+  REQUIRE(execute(makeInsert("users", {1, 20}), tc.ctx).success);
+  REQUIRE(execute(makeInsert("users", {2, 30}), tc.ctx).success);
+  REQUIRE(execute(makeInsert("users", {3, 40}), tc.ctx).success);
 
   auto result = execute(makeSelectAll("users"), tc.ctx);
-  REQUIRE(result.has_value());
-  CHECK(result.value().rows.size() == 3);
+  REQUIRE(result.success);
+  CHECK(result.rows.size() == 3);
+  CHECK(result.message == "3 rows");
 }
 
 TEST_CASE("execSelect with WHERE returns only matching rows") {
   TestCtx tc("users", {makeCol("id", DataType::INTEGER), makeCol("age", DataType::INTEGER)});
-  REQUIRE(execute(makeInsert("users", {1, 20}), tc.ctx).has_value());
-  REQUIRE(execute(makeInsert("users", {2, 30}), tc.ctx).has_value());
+  REQUIRE(execute(makeInsert("users", {1, 20}), tc.ctx).success);
+  REQUIRE(execute(makeInsert("users", {2, 30}), tc.ctx).success);
 
   auto result = execute(makeSelectWhere("users", "id", 1), tc.ctx);
-  REQUIRE(result.has_value());
-  REQUIRE(result.value().rows.size() == 1);
-  CHECK(std::get<int64_t>(result.value().rows[0][0]) == 1);
+  REQUIRE(result.success);
+  REQUIRE(result.rows.size() == 1);
+  CHECK(std::get<int64_t>(result.rows[0][0]) == 1);
 }
 
 TEST_CASE("execSelect with WHERE returns empty when no rows match") {
   TestCtx tc("users", {makeCol("id", DataType::INTEGER), makeCol("age", DataType::INTEGER)});
-  REQUIRE(execute(makeInsert("users", {1, 20}), tc.ctx).has_value());
+  REQUIRE(execute(makeInsert("users", {1, 20}), tc.ctx).success);
 
   auto result = execute(makeSelectWhere("users", "id", 99), tc.ctx);
-  REQUIRE(result.has_value());
-  CHECK(result.value().rows.empty());
+  REQUIRE(result.success);
+  CHECK(result.rows.empty());
 }
