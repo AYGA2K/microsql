@@ -1,10 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "catalog/catalog.h"
 #include <doctest/doctest.h>
-#include <filesystem>
 #include <fstream>
-
-namespace fs = std::filesystem;
 
 static ColumnDefinition makeCol(const std::string &name, DataType type,
                                 int textLength = 0, bool notNull = false,
@@ -28,52 +25,50 @@ static TableSchema makeTable(const std::string &name,
   return schema;
 }
 
-struct TempDir {
-  fs::path path;
-  TempDir() {
-    path = fs::temp_directory_path() / fs::path("catalog_test_XXXXXX");
-    fs::create_directories(path);
-  }
-  ~TempDir() { fs::remove_all(path); }
-  std::string str() const { return path.string(); }
+struct CatalogFile {
+  CatalogFile() {}
+  ~CatalogFile() { std::remove("catalog.txt"); }
+  CatalogFile(const CatalogFile &) = delete;
+  CatalogFile &operator=(const CatalogFile &) = delete;
 };
 
-TEST_CASE("load returns FileNotOpen when directory has no catalog.txt") {
+TEST_CASE("load returns FileNotOpen when catalog.txt does not exist") {
+  std::remove("catalog.txt");
   Catalog cat;
-  auto result = cat.load("/nonexistent/path/that/does/not/exist");
+  auto result = cat.load();
   REQUIRE_FALSE(result.has_value());
   CHECK(result.error() == CatalogError::FileNotOpen);
 }
 
 TEST_CASE("load returns UnvalidTableLineFormat for malformed TABLE line") {
-  TempDir dir;
-  std::ofstream f(dir.str() + "/catalog.txt");
-  f << "TABLE\n"; // missing name
+  CatalogFile cleanup;
+  std::ofstream f("catalog.txt");
+  f << "TABLE\n";
   f.close();
 
   Catalog cat;
-  auto result = cat.load(dir.str());
+  auto result = cat.load();
   REQUIRE_FALSE(result.has_value());
   CHECK(result.error() == CatalogError::UnvalidTableLineFormat);
 }
 
 TEST_CASE("load returns UnvalidColumnLineFormat for malformed COLUMN line") {
-  TempDir dir;
-  std::ofstream f(dir.str() + "/catalog.txt");
+  CatalogFile cleanup;
+  std::ofstream f("catalog.txt");
   f << "TABLE users\n";
-  f << "COLUMN id INTEGER\n"; // missing fields
+  f << "COLUMN id INTEGER\n";
   f << "END\n";
   f.close();
 
   Catalog cat;
-  auto result = cat.load(dir.str());
+  auto result = cat.load();
   REQUIRE_FALSE(result.has_value());
   CHECK(result.error() == CatalogError::UnvalidColumnLineFormat);
 }
 
 TEST_CASE("load parses a single table with all column types") {
-  TempDir dir;
-  std::ofstream f(dir.str() + "/catalog.txt");
+  CatalogFile cleanup;
+  std::ofstream f("catalog.txt");
   f << "TABLE products\n";
   f << "COLUMN id INTEGER 0 true true\n";
   f << "COLUMN price FLOAT 0 false false\n";
@@ -84,7 +79,7 @@ TEST_CASE("load parses a single table with all column types") {
   f.close();
 
   Catalog cat;
-  REQUIRE(cat.load(dir.str()).has_value());
+  REQUIRE(cat.load().has_value());
   REQUIRE(cat.tables.size() == 1);
 
   const auto &t = cat.tables[0];
@@ -109,8 +104,8 @@ TEST_CASE("load parses a single table with all column types") {
 }
 
 TEST_CASE("load parses multiple tables") {
-  TempDir dir;
-  std::ofstream f(dir.str() + "/catalog.txt");
+  CatalogFile cleanup;
+  std::ofstream f("catalog.txt");
   f << "TABLE users\n";
   f << "COLUMN id INTEGER 0 true true\n";
   f << "FILE users.db\n";
@@ -122,7 +117,7 @@ TEST_CASE("load parses multiple tables") {
   f.close();
 
   Catalog cat;
-  REQUIRE(cat.load(dir.str()).has_value());
+  REQUIRE(cat.load().has_value());
   CHECK(cat.tables.size() == 2);
   CHECK(cat.tables[0].tableName == "users");
   CHECK(cat.tables[1].tableName == "orders");
@@ -130,7 +125,7 @@ TEST_CASE("load parses multiple tables") {
 
 TEST_CASE(
     "save and load roundtrip preserves all fields across multiple tables") {
-  TempDir dir;
+  CatalogFile cleanup;
   Catalog cat;
   cat.addTable(
       makeTable("employees",
@@ -150,10 +145,10 @@ TEST_CASE(
                  makeCol("budget", DataType::FLOAT, 0, false, false),
                  makeCol("archived", DataType::BOOLEAN, 0, false, false)},
                 "projects.db"));
-  cat.save(dir.str());
+  cat.save();
 
   Catalog loaded;
-  REQUIRE(loaded.load(dir.str()).has_value());
+  REQUIRE(loaded.load().has_value());
   REQUIRE(loaded.tables.size() == 3);
 
   const auto &emp = loaded.tables[0];

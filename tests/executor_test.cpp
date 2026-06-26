@@ -6,7 +6,16 @@
 #include "parser/parser.h"
 #include "storage/page.h"
 #include <doctest/doctest.h>
+#include <fstream>
 #include <unistd.h>
+
+struct TempTableFile {
+  std::string path;
+  TempTableFile(const std::string &tableName) : path(tableName + ".microsql") {}
+  ~TempTableFile() { std::remove(path.c_str()); }
+  TempTableFile(const TempTableFile &) = delete;
+  TempTableFile &operator=(const TempTableFile &) = delete;
+};
 
 struct TempFile {
   std::string path;
@@ -189,6 +198,60 @@ static ParseResult makeUpdateWhere(const std::string &tableName,
   pr.statement.whereIndex = 3;
 
   return pr;
+}
+
+static ParseResult makeCreateTable(const std::string &tableName,
+                                   std::vector<ColumnDefinition> cols) {
+  ParseResult pr;
+  pr.statement.kind = StatementKind::CREATE_TABLE;
+  pr.statement.tableName = tableName;
+  pr.statement.columnDefinitions = std::move(cols);
+  return pr;
+}
+
+TEST_CASE("execCreateTable succeeds with correct message") {
+  TempTableFile cleanup("employees");
+  ExecutionContext ctx;
+  auto result = execute(
+      makeCreateTable("employees",
+                      {makeCol("id", DataType::INTEGER), makeCol("age", DataType::INTEGER)}),
+      ctx);
+  REQUIRE(result.success);
+  CHECK(result.message == "Table created");
+}
+
+TEST_CASE("execCreateTable registers schema in catalog") {
+  TempTableFile cleanup("employees");
+  ExecutionContext ctx;
+  REQUIRE(execute(makeCreateTable("employees",
+                                  {makeCol("id", DataType::INTEGER),
+                                   makeCol("age", DataType::INTEGER)}),
+                  ctx)
+              .success);
+  TableSchema *schema = ctx.catalog.findTable("employees");
+  REQUIRE(schema != nullptr);
+  CHECK(schema->tableName == "employees");
+  REQUIRE(schema->columns.size() == 2);
+  CHECK(schema->columns[0].name == "id");
+  CHECK(schema->columns[1].name == "age");
+  CHECK(schema->filePath == "employees.microsql");
+}
+
+TEST_CASE("execCreateTable creates .microsql file on disk") {
+  TempTableFile cleanup("employees");
+  ExecutionContext ctx;
+  REQUIRE(execute(makeCreateTable("employees", {makeCol("id", DataType::INTEGER)}), ctx).success);
+  std::ifstream f("employees.microsql");
+  CHECK(f.good());
+}
+
+TEST_CASE("execCreateTable fails on duplicate table") {
+  TempTableFile cleanup("employees");
+  ExecutionContext ctx;
+  REQUIRE(execute(makeCreateTable("employees", {makeCol("id", DataType::INTEGER)}), ctx).success);
+  auto result = execute(makeCreateTable("employees", {makeCol("id", DataType::INTEGER)}), ctx);
+  REQUIRE_FALSE(result.success);
+  CHECK(result.message == "duplicate table");
 }
 
 TEST_CASE("execInsert fails for unknown table") {
