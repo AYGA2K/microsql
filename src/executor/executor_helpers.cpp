@@ -22,6 +22,22 @@ const char *tableFileErrorStr(TableFileError error) {
     return "FailedToWritePage";
   case TableFileError::FailedToGetFileSize:
     return "FailedToGetFileSize";
+  case TableFileError::FailedToCreateFile:
+    return "FailedToCreateFile";
+  }
+  return "Unknown";
+}
+
+const char *catalogErrorStr(CatalogError error) {
+  switch (error) {
+  case CatalogError::DuplicateTable:
+    return "DuplicateTable";
+  case CatalogError::FileNotOpen:
+    return "FileNotOpen";
+  case CatalogError::UnvalidTableLineFormat:
+    return "UnvalidTableLineFormat";
+  case CatalogError::UnvalidColumnLineFormat:
+    return "UnvalidColumnLineFormat";
   }
   return "Unknown";
 }
@@ -69,16 +85,9 @@ const char *execErrorStr(ExecError error) {
     return "NOT NULL constraint violated";
   case ExecError::NotImplemented:
     return "not implemented";
-  // internal errors — details already logged to stderr
-  case ExecError::TableFileNotFound:
-  case ExecError::ErrorGettingNumberOfPages:
-  case ExecError::ErrorReadingPage:
-  case ExecError::ErrorDeserializeRow:
-  case ExecError::ErrorSerializeRow:
-  case ExecError::ErrorInsertingRow:
-  case ExecError::ErrorUpdatingRow:
-  case ExecError::ErrorDeletingRow:
-  case ExecError::GettingRowFromInsertValues:
+  case ExecError::DuplicateTable:
+    return "duplicate table";
+  case ExecError::InternalError:
     return "internal error";
   }
   return "internal error";

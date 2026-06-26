@@ -18,6 +18,7 @@ enum class TableFileError {
   FailedToReadPage,
   FailedToWritePage,
   FailedToGetFileSize,
+  FailedToCreateFile,
 };
 inline constexpr int PAGE_SIZE = 4096;
 inline constexpr int HEADER_SIZE = 16;
@@ -59,6 +60,7 @@ struct TableFile {
   std::string filePath;
   std::fstream file;
 
+  std::expected<void, TableFileError> create();
   std::expected<void, TableFileError> open(const std::string &path);
   void close();
   std::expected<Page *, TableFileError> readPage(uint32_t pageId);

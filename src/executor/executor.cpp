@@ -1,5 +1,7 @@
 #include "executor.h"
 #include "ast/statement.h"
+#include "catalog/catalog.h"
+#include "catalog/tableschema.h"
 #include "executor_helpers.h"
 #include "storage/page.h"
 #include "storage/row.h"
@@ -21,13 +23,20 @@ resolveTable(const std::string &tableName, ExecutionContext &ctx) {
                  tableName);
     return std::unexpected(ExecError::TableSchemaNotFound);
   }
-  TableFile *file = ctx.openFiles.at(tableName);
-  if (!file) {
-    std::println(stderr, "[Executor] table file not found for table '{}'",
-                 tableName);
-    return std::unexpected(ExecError::TableFileNotFound);
+  auto it = ctx.openFiles.find(tableName);
+  if (it == ctx.openFiles.end()) {
+    TableFile *tableFile = new TableFile{};
+    auto opened = tableFile->open(schema->filePath);
+    if (!opened) {
+      std::println(stderr, "[Executor] failed to open file for table '{}': {}",
+                   tableName, tableFileErrorStr(opened.error()));
+      delete tableFile;
+      return std::unexpected(ExecError::InternalError);
+    }
+    ctx.openFiles[tableName] = tableFile;
+    return ResolvedTable{schema, tableFile};
   }
-  return ResolvedTable{schema, file};
+  return ResolvedTable{schema, it->second};
 }
 
 static std::expected<size_t, ExecError>
@@ -37,7 +46,7 @@ getNumPages(TableFile *file, const std::string &tableName) {
     std::println(stderr,
                  "[Executor] failed to get number of pages for table '{}': {}",
                  tableName, tableFileErrorStr(numPages.error()));
-    return std::unexpected(ExecError::ErrorGettingNumberOfPages);
+    return std::unexpected(ExecError::InternalError);
   }
   return numPages.value();
 }
@@ -48,7 +57,7 @@ readPage(TableFile *file, size_t pageIndex, const std::string &tableName) {
   if (!page) {
     std::println(stderr, "[Executor] failed to read page {} of table '{}': {}",
                  pageIndex, tableName, tableFileErrorStr(page.error()));
-    return std::unexpected(ExecError::ErrorReadingPage);
+    return std::unexpected(ExecError::InternalError);
   }
   return page.value();
 }
@@ -63,7 +72,7 @@ readSlotRow(Page *page, uint16_t slot, size_t pageIndex,
     std::println(stderr,
                  "[Executor] failed to read slot {} on page {} of table '{}'",
                  slot, pageIndex, tableName);
-    return std::unexpected(ExecError::ErrorReadingPage);
+    return std::unexpected(ExecError::InternalError);
   }
   auto row = deserializeRow(rowData.value(), columns);
   if (!row) {
@@ -71,7 +80,7 @@ readSlotRow(Page *page, uint16_t slot, size_t pageIndex,
                  "[Executor] failed to deserialize row from slot {} on page "
                  "{} of table '{}'",
                  slot, pageIndex, tableName);
-    return std::unexpected(ExecError::ErrorDeserializeRow);
+    return std::unexpected(ExecError::InternalError);
   }
   return row.value();
 }
@@ -145,13 +154,13 @@ insertRowIntoPage(Page *page, const uint8_t *rowBytes, uint16_t rowSizeBytes,
     std::println(stderr,
                  "[Executor] failed to insert row in page {} of table '{}': {}",
                  page->pageId, tableName, pageErrorStr(ok.error()));
-    return std::unexpected(ExecError::ErrorInsertingRow);
+    return std::unexpected(ExecError::InternalError);
   }
   auto written = tableFile->writePage(*page);
   if (!written) {
     std::println(stderr, "[Executor] failed to write page {} of table '{}': {}",
                  page->pageId, tableName, tableFileErrorStr(written.error()));
-    return std::unexpected(ExecError::ErrorInsertingRow);
+    return std::unexpected(ExecError::InternalError);
   }
   return {};
 }
@@ -188,7 +197,7 @@ static std::expected<void, ExecError> execInsert(const ParseResult &parseResult,
     std::println(
         stderr, "[Executor] failed to serialize row for table '{}': {}",
         parseResult.statement.tableName, rowErrorStr(rowBytes.error()));
-    return std::unexpected(ExecError::ErrorSerializeRow);
+    return std::unexpected(ExecError::InternalError);
   }
 
   auto numPages = getNumPages(file, parseResult.statement.tableName);
@@ -214,14 +223,14 @@ static std::expected<void, ExecError> execInsert(const ParseResult &parseResult,
     }
     pageIndex++;
   }
-  if (pageIndex == numPages.value()) {
+  if (pageIndex >= numPages.value()) {
     auto newPageId = file->allocatePage();
     if (!newPageId) {
       std::println(stderr,
                    "[Executor] failed to allocate page for table '{}': {}",
                    parseResult.statement.tableName,
                    tableFileErrorStr(newPageId.error()));
-      return std::unexpected(ExecError::ErrorInsertingRow);
+      return std::unexpected(ExecError::InternalError);
     }
     auto page =
         readPage(file, newPageId.value(), parseResult.statement.tableName);
@@ -292,7 +301,7 @@ static std::expected<int, ExecError> execDelete(const ParseResult &parseResult,
                        "[Executor] failed to delete slot {} on page {} of "
                        "table '{}'",
                        slot, pageIndex, parseResult.statement.tableName);
-          return std::unexpected(ExecError::ErrorDeletingRow);
+          return std::unexpected(ExecError::InternalError);
         }
         deletedCount++;
       }
@@ -303,7 +312,7 @@ static std::expected<int, ExecError> execDelete(const ParseResult &parseResult,
                    "[Executor] failed to write page {} of table '{}': {}",
                    pageIndex, parseResult.statement.tableName,
                    tableFileErrorStr(written.error()));
-      return std::unexpected(ExecError::ErrorInsertingRow);
+      return std::unexpected(ExecError::InternalError);
     }
     pageIndex++;
   }
@@ -365,19 +374,21 @@ static std::expected<int, ExecError> execUpdate(const ParseResult &parseResult,
         }
         auto rowBytes = serializeRow(updated.value(), schema->columns);
         if (!rowBytes) {
-          std::println(stderr,
-                       "[Executor] failed to serialize updated row for table '{}'",
-                       parseResult.statement.tableName);
-          return std::unexpected(ExecError::ErrorSerializeRow);
+          std::println(
+              stderr,
+              "[Executor] failed to serialize updated row for table '{}'",
+              parseResult.statement.tableName);
+          return std::unexpected(ExecError::InternalError);
         }
         uint16_t rowSizeBytes = rowSize(schema->columns);
-        auto ok = page.value()->updateRow(slot, rowBytes.value().data(), rowSizeBytes);
+        auto ok = page.value()->updateRow(slot, rowBytes.value().data(),
+                                          rowSizeBytes);
         if (!ok) {
           std::println(stderr,
                        "[Executor] failed to update slot {} on page {} of "
                        "table '{}'",
                        slot, pageIndex, parseResult.statement.tableName);
-          return std::unexpected(ExecError::ErrorUpdatingRow);
+          return std::unexpected(ExecError::InternalError);
         }
         updatedCount++;
       }
@@ -388,7 +399,7 @@ static std::expected<int, ExecError> execUpdate(const ParseResult &parseResult,
                    "[Executor] failed to write page {} of table '{}': {}",
                    pageIndex, parseResult.statement.tableName,
                    tableFileErrorStr(written.error()));
-      return std::unexpected(ExecError::ErrorUpdatingRow);
+      return std::unexpected(ExecError::InternalError);
     }
     pageIndex++;
   }
@@ -396,8 +407,36 @@ static std::expected<int, ExecError> execUpdate(const ParseResult &parseResult,
   return updatedCount;
 }
 
+std::expected<void, ExecError> execCreateTable(const ParseResult &parseResult,
+                                               ExecutionContext &ctx) {
+  Catalog &catalog = ctx.catalog;
+  const std::string &tableName = parseResult.statement.tableName;
+
+  TableSchema tableSchema;
+  tableSchema.tableName = tableName;
+  tableSchema.columns = parseResult.statement.columnDefinitions;
+  tableSchema.filePath = std::format("{}.microsql", tableName);
+  TableFile tableFile(tableSchema.filePath);
+  auto ok = tableFile.create();
+  if (!ok) {
+    std::println(stderr, "[Executor] failed to create table '{}': {}",
+                 tableName, tableFileErrorStr(ok.error()));
+    return std::unexpected(ExecError::InternalError);
+  }
+  auto result = catalog.addTable(tableSchema);
+  if (!result) {
+    std::println(stderr, "[Executor] failed to add table '{}': {}", tableName,
+                 catalogErrorStr(result.error()));
+    return std::unexpected(ExecError::DuplicateTable);
+  }
+  return {};
+}
+
 static Result makeError(ExecError err) {
-  return Result{.success = false, .message = execErrorStr(err), .columns = {}, .rows = {}};
+  return Result{.success = false,
+                .message = execErrorStr(err),
+                .columns = {},
+                .rows = {}};
 }
 
 Result execute(const ParseResult &parseResult, ExecutionContext &ctx) {
@@ -417,7 +456,10 @@ Result execute(const ParseResult &parseResult, ExecutionContext &ctx) {
     if (!ok) {
       return makeError(ok.error());
     }
-    return Result{.success = true, .message = "1 row inserted", .columns = {}, .rows = {}};
+    return Result{.success = true,
+                  .message = "1 row inserted",
+                  .columns = {},
+                  .rows = {}};
   }
   case StatementKind::DELETE: {
     auto count = execDelete(parseResult, ctx);
@@ -426,7 +468,8 @@ Result execute(const ParseResult &parseResult, ExecutionContext &ctx) {
     }
     int n = count.value();
     return Result{.success = true,
-                  .message = std::format("{} row{} deleted", n, n == 1 ? "" : "s"),
+                  .message =
+                      std::format("{} row{} deleted", n, n == 1 ? "" : "s"),
                   .columns = {},
                   .rows = {}};
   }
@@ -437,11 +480,19 @@ Result execute(const ParseResult &parseResult, ExecutionContext &ctx) {
     }
     int n = count.value();
     return Result{.success = true,
-                  .message = std::format("{} row{} updated", n, n == 1 ? "" : "s"),
+                  .message =
+                      std::format("{} row{} updated", n, n == 1 ? "" : "s"),
                   .columns = {},
                   .rows = {}};
   }
-  case StatementKind::CREATE_TABLE:
+  case StatementKind::CREATE_TABLE: {
+    auto ok = execCreateTable(parseResult, ctx);
+    if (!ok) {
+      return makeError(ok.error());
+    }
+    return Result{
+        .success = true, .message = "Table created", .columns = {}, .rows = {}};
+  }
   case StatementKind::DROP_TABLE:
   case StatementKind::CREATE_INDEX:
   case StatementKind::BEGIN:

@@ -9,22 +9,15 @@
 
 enum class ExecError {
   TableSchemaNotFound,
-  TableFileNotFound,
-  ErrorGettingNumberOfPages,
-  ErrorReadingPage,
-  ErrorDeserializeRow,
-  ErrorSerializeRow,
   ErrorGettingData,
-  ErrorInsertingRow,
-  ErrorUpdatingRow,
-  ErrorDeletingRow,
   TypeMismatch,
   DivisionByZero,
   InvalidExpression,
-  GettingRowFromInsertValues,
   ColumnCountMismatch,
   NotNullViolation,
-  NotImplemented
+  NotImplemented,
+  DuplicateTable,
+  InternalError,
 };
 
 struct Result {

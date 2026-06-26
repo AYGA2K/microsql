@@ -7,14 +7,15 @@
 enum class CatalogError {
   FileNotOpen,
   UnvalidTableLineFormat,
-  UnvalidColumnLineFormat
+  UnvalidColumnLineFormat,
+  DuplicateTable
 };
 
 struct Catalog {
   std::vector<TableSchema> tables;
-  std::expected<void, CatalogError> load(const std::string &directory);
-  void save(const std::string &directory);
+  std::expected<void, CatalogError> load();
+  void save();
   TableSchema *findTable(const std::string &name);
-  void addTable(const TableSchema &schema);
+  std::expected<void, CatalogError> addTable(const TableSchema &schema);
   void dropTable(const std::string &name);
 };

@@ -3,17 +3,21 @@
 #include "ast/statement.h"
 #include "catalog/tableschema.h"
 #include <expected>
-#include <print>
 #include <fstream>
+#include <print>
 #include <sstream>
 #include <string>
 
 static const char *dataTypeName(DataType t) {
   switch (t) {
-  case DataType::INTEGER: return "INTEGER";
-  case DataType::FLOAT:   return "FLOAT";
-  case DataType::TEXT:    return "TEXT";
-  case DataType::BOOLEAN: return "BOOLEAN";
+  case DataType::INTEGER:
+    return "INTEGER";
+  case DataType::FLOAT:
+    return "FLOAT";
+  case DataType::TEXT:
+    return "TEXT";
+  case DataType::BOOLEAN:
+    return "BOOLEAN";
   }
   return "";
 }
@@ -29,8 +33,8 @@ std::vector<std::string> split(const std::string &s) {
   return result;
 }
 
-std::expected<void, CatalogError> Catalog::load(const std::string &directory) {
-  std::string path = directory + "/catalog.txt";
+std::expected<void, CatalogError> Catalog::load() {
+  std::string path = "catalog.txt";
   std::ifstream file(path);
   if (!file.is_open()) {
     std::println(stderr, "[Catalog] failed to open '{}'", path);
@@ -44,9 +48,10 @@ std::expected<void, CatalogError> Catalog::load(const std::string &directory) {
       TableSchema tableSchema;
       auto words = split(line);
       if (words.size() != 2) {
-        std::println(stderr,
-                     "[Catalog] line {}: expected 'TABLE <name>', got '{}' ({} token{})",
-                     lineNum, line, words.size(), words.size() == 1 ? "" : "s");
+        std::println(
+            stderr,
+            "[Catalog] line {}: expected 'TABLE <name>', got '{}' ({} token{})",
+            lineNum, line, words.size(), words.size() == 1 ? "" : "s");
         return std::unexpected(CatalogError::UnvalidTableLineFormat);
       }
       tableSchema.tableName = words[1];
@@ -55,11 +60,13 @@ std::expected<void, CatalogError> Catalog::load(const std::string &directory) {
         if (line.starts_with("COLUMN")) {
           words = split(line);
           if (words.size() != 6) {
-            std::println(stderr,
-                         "[Catalog] line {} in table '{}': expected 'COLUMN <name> <type> "
-                         "<textLength> <notNull> <primaryKey>', got '{}' ({} token{})",
-                         lineNum, tableSchema.tableName, line, words.size(),
-                         words.size() == 1 ? "" : "s");
+            std::println(
+                stderr,
+                "[Catalog] line {} in table '{}': expected 'COLUMN <name> "
+                "<type> "
+                "<textLength> <notNull> <primaryKey>', got '{}' ({} token{})",
+                lineNum, tableSchema.tableName, line, words.size(),
+                words.size() == 1 ? "" : "s");
             return std::unexpected(CatalogError::UnvalidColumnLineFormat);
           }
           ColumnDefinition column;
@@ -100,25 +107,28 @@ TableSchema *Catalog::findTable(const std::string &name) {
   return nullptr;
 }
 
-void Catalog::addTable(const TableSchema &schema) {
+std::expected<void, CatalogError> Catalog::addTable(const TableSchema &schema) {
+  for (const auto &t : tables) {
+    if (t.tableName == schema.tableName)
+      return std::unexpected(CatalogError::DuplicateTable);
+  }
   tables.push_back(schema);
+  return {};
 }
 
 void Catalog::dropTable(const std::string &name) {
-  std::erase_if(tables, [&](const TableSchema &t) { return t.tableName == name; });
+  std::erase_if(tables,
+                [&](const TableSchema &t) { return t.tableName == name; });
 }
 
-void Catalog::save(const std::string &directory) {
-  std::ofstream file(directory + "/catalog.txt");
+void Catalog::save() {
+  std::ofstream file("catalog.txt");
   for (const auto &table : tables) {
     file << "TABLE " << table.tableName << "\n";
     for (const auto &col : table.columns) {
-      file << "COLUMN " << col.name
-           << " " << dataTypeName(col.type)
-           << " " << col.textLength
-           << " " << (col.notNull    ? "true" : "false")
-           << " " << (col.primaryKey ? "true" : "false")
-           << "\n";
+      file << "COLUMN " << col.name << " " << dataTypeName(col.type) << " "
+           << col.textLength << " " << (col.notNull ? "true" : "false") << " "
+           << (col.primaryKey ? "true" : "false") << "\n";
     }
     file << "FILE " << table.filePath << "\n";
     file << "END\n";

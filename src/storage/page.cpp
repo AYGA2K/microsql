@@ -132,6 +132,14 @@ Page::updateRow(uint16_t slotIndex, const uint8_t *rowBytes, uint16_t rowLen) {
   return this->data + oldRowOffset;
 }
 
+std::expected<void, TableFileError> TableFile::create() {
+  std::ofstream file(this->filePath);
+  if (!file.is_open()) {
+    return std::unexpected(TableFileError::FailedToCreateFile);
+  }
+  return {};
+}
+
 std::expected<void, TableFileError> TableFile::open(const std::string &path) {
   this->filePath = path;
   this->file.open(path, std::ios::binary | std::ios::in | std::ios::out);

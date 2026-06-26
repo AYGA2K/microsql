@@ -14,6 +14,7 @@ const char *tableFileErrorStr(TableFileError error);
 const char *pageErrorStr(PageError error);
 const char *rowErrorStr(RowError error);
 const char *execErrorStr(ExecError error);
+const char *catalogErrorStr(CatalogError error);
 
 int indexOf(const std::vector<std::string> &vec, const std::string &value);
 
