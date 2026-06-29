@@ -37,7 +37,6 @@ std::expected<void, CatalogError> Catalog::load() {
   std::string path = "catalog.txt";
   std::ifstream file(path);
   if (!file.is_open()) {
-    std::println(stderr, "[Catalog] failed to open '{}'", path);
     return std::unexpected(CatalogError::FileNotOpen);
   }
   std::string line;

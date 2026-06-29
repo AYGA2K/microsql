@@ -600,7 +600,7 @@ void Parser::parseCreateTable() {
           return;
         }
       } else {
-        colDefinition.textLength = 0;
+        colDefinition.textLength = 255;
         this->advance();
       }
       break;

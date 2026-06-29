@@ -20,7 +20,7 @@ enum class DataType { INTEGER, FLOAT, TEXT, BOOLEAN };
 struct ColumnDefinition {
   std::string name;
   DataType type;
-  int textLength; // for TEXT(n); 0 otherwise
+  int textLength; // for TEXT(n); defaults to 255 if no length specified
   bool notNull = false;
   bool primaryKey = false;
 

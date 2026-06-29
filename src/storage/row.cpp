@@ -36,7 +36,9 @@ std::expected<std::vector<uint8_t>, RowError> serializeRow(const Row &row,
     }
     case DataType::TEXT: {
       const std::string &v = std::get<std::string>(value);
-      std::memcpy(output.data() + offset, v.data(), schema[i].size());
+      // Copy only as many bytes as the string holds
+      size_t len = std::min(v.size(), static_cast<size_t>(schema[i].size()));
+      std::memcpy(output.data() + offset, v.data(), len);
       offset += schema[i].size();
       break;
     }
@@ -77,6 +79,11 @@ std::expected<Row, RowError> deserializeRow(const uint8_t *data,
     case DataType::TEXT: {
       std::string val(reinterpret_cast<const char *>(data + offset),
                       colDef.size());
+      // Strip the null-padding that fills the rest of the fixed-width field
+      size_t end = val.find('\0');
+      if (end != std::string::npos) {
+        val.resize(end);
+      }
       row.push_back(std::move(val));
       offset += colDef.size();
       break;

@@ -416,20 +416,37 @@ std::expected<void, ExecError> execCreateTable(const ParseResult &parseResult,
   tableSchema.tableName = tableName;
   tableSchema.columns = parseResult.statement.columnDefinitions;
   tableSchema.filePath = std::format("{}.microsql", tableName);
-  TableFile tableFile;
-  tableFile.filePath = tableSchema.filePath;
-  auto ok = tableFile.create();
-  if (!ok) {
+  TableFile *tableFile = new TableFile{};
+  tableFile->filePath = tableSchema.filePath;
+  auto created = tableFile->create();
+  if (!created) {
     std::println(stderr, "[Executor] failed to create table '{}': {}",
-                 tableName, tableFileErrorStr(ok.error()));
+                 tableName, tableFileErrorStr(created.error()));
+    delete tableFile;
+    return std::unexpected(ExecError::InternalError);
+  }
+  auto opened = tableFile->open(tableSchema.filePath);
+  if (!opened) {
+    std::println(stderr, "[Executor] failed to open table '{}' after create: {}",
+                 tableName, tableFileErrorStr(opened.error()));
+    delete tableFile;
+    return std::unexpected(ExecError::InternalError);
+  }
+  auto allocated = tableFile->allocatePage();
+  if (!allocated) {
+    std::println(stderr, "[Executor] failed to allocate header page for table '{}': {}",
+                 tableName, tableFileErrorStr(allocated.error()));
+    delete tableFile;
     return std::unexpected(ExecError::InternalError);
   }
   auto result = catalog.addTable(tableSchema);
   if (!result) {
     std::println(stderr, "[Executor] failed to add table '{}': {}", tableName,
                  catalogErrorStr(result.error()));
+    delete tableFile;
     return std::unexpected(ExecError::DuplicateTable);
   }
+  ctx.openFiles[tableName] = tableFile;
   return {};
 }
 

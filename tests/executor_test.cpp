@@ -200,6 +200,27 @@ static ParseResult makeUpdateWhere(const std::string &tableName,
   return pr;
 }
 
+static ParseResult makeInsertText(const std::string &tableName,
+                                  int64_t id, const std::string &text) {
+  ParseResult pr;
+  pr.statement.kind = StatementKind::INSERT;
+  pr.statement.tableName = tableName;
+
+  Expression idExpr;
+  idExpr.kind = ExpressionKind::LITERAL_INT;
+  idExpr.intValue = id;
+  pr.statement.insertValues.push_back(pr.expressions.size());
+  pr.expressions.push_back(idExpr);
+
+  Expression textExpr;
+  textExpr.kind = ExpressionKind::LITERAL_TEXT;
+  textExpr.textValue = text;
+  pr.statement.insertValues.push_back(pr.expressions.size());
+  pr.expressions.push_back(textExpr);
+
+  return pr;
+}
+
 static ParseResult makeCreateTable(const std::string &tableName,
                                    std::vector<ColumnDefinition> cols) {
   ParseResult pr;
@@ -474,4 +495,38 @@ TEST_CASE("execUpdate with WHERE that matches nothing updates zero rows") {
   REQUIRE(sel.success);
   REQUIRE(sel.rows.size() == 1);
   CHECK(std::get<int64_t>(sel.rows[0][1]) == 20);
+}
+
+TEST_CASE("execSelect TEXT column roundtrip preserves value exactly") {
+  TestCtx tc("users", {makeCol("id", DataType::INTEGER),
+                        makeCol("name", DataType::TEXT, 50)});
+  REQUIRE(execute(makeInsertText("users", 1, "Alice"), tc.ctx).success);
+  REQUIRE(execute(makeInsertText("users", 2, "Bob"), tc.ctx).success);
+
+  auto sel = execute(makeSelectAll("users"), tc.ctx);
+  REQUIRE(sel.success);
+  REQUIRE(sel.rows.size() == 2);
+  CHECK(std::get<int64_t>(sel.rows[0][0]) == 1);
+  CHECK(std::get<std::string>(sel.rows[0][1]) == "Alice");
+  CHECK(std::get<int64_t>(sel.rows[1][0]) == 2);
+  CHECK(std::get<std::string>(sel.rows[1][1]) == "Bob");
+}
+
+TEST_CASE("CREATE TABLE then INSERT then SELECT returns correct rows") {
+  TempTableFile cleanup("users");
+  ExecutionContext ctx;
+
+  REQUIRE(execute(makeCreateTable("users", {makeCol("id", DataType::INTEGER),
+                                            makeCol("name", DataType::TEXT, 50)}),
+                  ctx).success);
+  REQUIRE(execute(makeInsertText("users", 1, "Alice"), ctx).success);
+  REQUIRE(execute(makeInsertText("users", 2, "Bob"), ctx).success);
+
+  auto sel = execute(makeSelectAll("users"), ctx);
+  REQUIRE(sel.success);
+  REQUIRE(sel.rows.size() == 2);
+  CHECK(std::get<int64_t>(sel.rows[0][0]) == 1);
+  CHECK(std::get<std::string>(sel.rows[0][1]) == "Alice");
+  CHECK(std::get<int64_t>(sel.rows[1][0]) == 2);
+  CHECK(std::get<std::string>(sel.rows[1][1]) == "Bob");
 }
