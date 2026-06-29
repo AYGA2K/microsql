@@ -127,24 +127,24 @@ TEST_CASE(
     "save and load roundtrip preserves all fields across multiple tables") {
   CatalogFile cleanup;
   Catalog cat;
-  cat.addTable(
+  REQUIRE(cat.addTable(
       makeTable("employees",
                 {makeCol("id", DataType::INTEGER, 0, true, true),
                  makeCol("name", DataType::TEXT, 50, true, false),
                  makeCol("salary", DataType::FLOAT, 0, false, false),
                  makeCol("active", DataType::BOOLEAN, 0, false, false)},
-                "employees.db"));
-  cat.addTable(
+                "employees.db")).has_value());
+  REQUIRE(cat.addTable(
       makeTable("departments",
                 {makeCol("dept_id", DataType::INTEGER, 0, true, true),
                  makeCol("dept_name", DataType::TEXT, 30, true, false)},
-                "departments.db"));
-  cat.addTable(
+                "departments.db")).has_value());
+  REQUIRE(cat.addTable(
       makeTable("projects",
                 {makeCol("proj_id", DataType::INTEGER, 0, true, true),
                  makeCol("budget", DataType::FLOAT, 0, false, false),
                  makeCol("archived", DataType::BOOLEAN, 0, false, false)},
-                "projects.db"));
+                "projects.db")).has_value());
   cat.save();
 
   Catalog loaded;
@@ -185,17 +185,17 @@ TEST_CASE(
 TEST_CASE("addTable appends to tables vector") {
   Catalog cat;
   CHECK(cat.tables.empty());
-  cat.addTable(makeTable("foo"));
+  REQUIRE(cat.addTable(makeTable("foo")).has_value());
   CHECK(cat.tables.size() == 1);
-  cat.addTable(makeTable("bar"));
+  REQUIRE(cat.addTable(makeTable("bar")).has_value());
   CHECK(cat.tables.size() == 2);
 }
 
 TEST_CASE("dropTable removes the named table") {
   Catalog cat;
-  cat.addTable(makeTable("alpha"));
-  cat.addTable(makeTable("beta"));
-  cat.addTable(makeTable("gamma"));
+  REQUIRE(cat.addTable(makeTable("alpha")).has_value());
+  REQUIRE(cat.addTable(makeTable("beta")).has_value());
+  REQUIRE(cat.addTable(makeTable("gamma")).has_value());
 
   cat.dropTable("beta");
   REQUIRE(cat.tables.size() == 2);
@@ -205,14 +205,14 @@ TEST_CASE("dropTable removes the named table") {
 
 TEST_CASE("dropTable is a no-op for unknown name") {
   Catalog cat;
-  cat.addTable(makeTable("only"));
+  REQUIRE(cat.addTable(makeTable("only")).has_value());
   cat.dropTable("missing");
   CHECK(cat.tables.size() == 1);
 }
 
 TEST_CASE("findTable returns pointer to existing table") {
   Catalog cat;
-  cat.addTable(makeTable("target"));
+  REQUIRE(cat.addTable(makeTable("target")).has_value());
   auto *p = cat.findTable("target");
   REQUIRE(p != nullptr);
   CHECK(p->tableName == "target");
@@ -220,7 +220,7 @@ TEST_CASE("findTable returns pointer to existing table") {
 
 TEST_CASE("findTable returns nullptr for missing table") {
   Catalog cat;
-  cat.addTable(makeTable("other"));
+  REQUIRE(cat.addTable(makeTable("other")).has_value());
   CHECK(cat.findTable("ghost") == nullptr);
 }
 

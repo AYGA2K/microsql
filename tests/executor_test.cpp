@@ -54,7 +54,7 @@ struct TestCtx {
     TableSchema schema;
     schema.tableName = tableName;
     schema.columns = std::move(cols);
-    ctx.catalog.addTable(schema);
+    REQUIRE(ctx.catalog.addTable(schema).has_value());
     ctx.openFiles[tableName] = tf;
   }
 

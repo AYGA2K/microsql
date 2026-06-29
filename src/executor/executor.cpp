@@ -416,7 +416,8 @@ std::expected<void, ExecError> execCreateTable(const ParseResult &parseResult,
   tableSchema.tableName = tableName;
   tableSchema.columns = parseResult.statement.columnDefinitions;
   tableSchema.filePath = std::format("{}.microsql", tableName);
-  TableFile tableFile(tableSchema.filePath);
+  TableFile tableFile;
+  tableFile.filePath = tableSchema.filePath;
   auto ok = tableFile.create();
   if (!ok) {
     std::println(stderr, "[Executor] failed to create table '{}': {}",

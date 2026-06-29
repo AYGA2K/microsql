@@ -19,6 +19,8 @@ static const char *tableFileErrorStr(TableFileError e) {
     return "FailedToWritePage";
   case TableFileError::FailedToGetFileSize:
     return "FailedToGetFileSize";
+  case TableFileError::FailedToCreateFile:
+    return "FailedToCreateFile";
   }
   return "Unknown";
 }
