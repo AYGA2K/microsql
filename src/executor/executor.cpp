@@ -206,7 +206,7 @@ static std::expected<void, ExecError> execInsert(const ParseResult &parseResult,
     return std::unexpected(numPages.error());
   }
 
-  uint16_t rowSizeBytes = rowSize(schema->columns);
+  uint16_t rowSizeBytes = static_cast<uint16_t>(rowBytes.value().size());
   // Page 0 is reserved, data starts at page 1
   size_t pageIndex = 1;
   while (pageIndex < numPages.value()) {
@@ -384,7 +384,7 @@ static std::expected<int, ExecError> execUpdate(const ParseResult &parseResult,
               parseResult.statement.tableName);
           return std::unexpected(ExecError::InternalError);
         }
-        uint16_t rowSizeBytes = rowSize(schema->columns);
+        uint16_t rowSizeBytes = static_cast<uint16_t>(rowBytes.value().size());
         auto ok = page.value()->updateRow(slot, rowBytes.value().data(),
                                           rowSizeBytes);
         if (!ok) {

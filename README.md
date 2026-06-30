@@ -8,7 +8,7 @@ A SQL database engine built from scratch to learn how databases work. It is writ
 
 **Parser:** — takes the tokens and produces an AST made of a `Statement` and a list of `Expression`s.
 
-**Executor:** — walks the AST and runs the query. For reads it scans pages, evaluates the WHERE clause per row, and builds the result. For writes it serializes the row and inserts or updates it in place.
+**Executor:** — walks the AST and runs the query. For reads it scans pages, evaluates the WHERE clause per row, and builds the result. For writes it serializes the row and inserts or updates it — updates are in place if the row fits, otherwise the new row is written at the free pointer.
 
 **Storage:** — each table is a binary `.ms` file split into 4096-byte slotted pages. The slot directory grows down from the header, row data grows up from the end, and free space sits in the middle.
 
@@ -30,7 +30,7 @@ A SQL database engine built from scratch to learn how databases work. It is writ
 +--------------------+  4096
 ```
 
-Rows are fixed-width: `INTEGER` and `FLOAT` as 8 bytes, `BOOLEAN` as 1 byte, `TEXT(n)` as n bytes zero-padded.
+Row encoding: `INTEGER` and `FLOAT` are 8 bytes, `BOOLEAN` is 1 byte. `TEXT(n)` is stored as a 2-byte length prefix followed by the actual string bytes, so shorter strings take less space. If an update makes a row larger than the original, the new row is written at the free pointer and the slot is updated to point to it.
 
 **Catalog** — stores table schemas in a `catalog.txt` file. It is written on every `CREATE TABLE` or `DROP TABLE` and loaded on startup.
 

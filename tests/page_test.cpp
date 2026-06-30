@@ -139,6 +139,57 @@ TEST_CASE("updateRow overwrites data in place") {
 }
 
 
+TEST_CASE("updateRow grows row into free space") {
+  Page p = makePage();
+  auto original = makeRow(16, 0xAA);
+  auto bigger = makeRow(20, 0xBB);
+  REQUIRE(p.insertRow(original.data(), original.size()).has_value());
+
+  auto result = p.updateRow(0, bigger.data(), bigger.size());
+  REQUIRE(result.has_value());
+  CHECK(std::memcmp(*result, bigger.data(), 20) == 0);
+
+  uint16_t len = 0;
+  auto read = p.readRow(0, &len);
+  REQUIRE(read.has_value());
+  CHECK(len == 20);
+  CHECK(std::memcmp(*read, bigger.data(), 20) == 0);
+}
+
+TEST_CASE("updateRow grow updates free pointer so next insert does not corrupt it") {
+  Page p = makePage();
+  auto original = makeRow(16, 0xAA);
+  auto bigger = makeRow(20, 0xBB);
+  REQUIRE(p.insertRow(original.data(), original.size()).has_value());
+  REQUIRE(p.updateRow(0, bigger.data(), bigger.size()).has_value());
+
+  auto newRow = makeRow(8, 0xCC);
+  REQUIRE(p.insertRow(newRow.data(), newRow.size()).has_value());
+
+  uint16_t newLen = 0;
+  auto newRead = p.readRow(1, &newLen);
+  REQUIRE(newRead.has_value());
+  CHECK(std::memcmp(*newRead, newRow.data(), 8) == 0);
+
+  uint16_t len = 0;
+  auto read = p.readRow(0, &len);
+  REQUIRE(read.has_value());
+  CHECK(std::memcmp(*read, bigger.data(), 20) == 0);
+}
+
+TEST_CASE("updateRow returns PageFull when page has no space to grow row") {
+  Page p = makePage();
+  auto row = makeRow(100, 0xAA);
+  REQUIRE(p.insertRow(row.data(), row.size()).has_value());
+  auto filler = makeRow(100, 0xFF);
+  while (p.insertRow(filler.data(), filler.size()).has_value()) {
+  }
+
+  auto bigger = makeRow(200, 0xBB);
+  CHECK(p.updateRow(0, bigger.data(), bigger.size()).error() ==
+        PageError::PageFull);
+}
+
 TEST_CASE("updateRow returns SlotOutOfBounds for out-of-bounds index") {
   Page p = makePage();
   auto row = makeRow(8);

@@ -53,7 +53,10 @@ TEST_CASE("serializeRow TEXT writes correct bytes") {
   Row row = {std::string("hello")};
   auto result = serializeRow(row, schema);
   REQUIRE(result.has_value());
-  CHECK(std::memcmp(result.value().data(), "hello", 5) == 0);
+  uint16_t len;
+  std::memcpy(&len, result.value().data(), 2);
+  CHECK(len == 5);
+  CHECK(std::memcmp(result.value().data() + 2, "hello", 5) == 0);
 }
 
 TEST_CASE("serializeRow multi-column row lays out fields contiguously") {
@@ -97,7 +100,7 @@ TEST_CASE("deserializeRow FLOAT reads correct value") {
 
 TEST_CASE("deserializeRow TEXT reads correct value") {
   Schema schema = {makeCol(DataType::TEXT, 5)};
-  std::vector<uint8_t> buf = {'h', 'e', 'l', 'l', 'o'};
+  std::vector<uint8_t> buf = {5, 0, 'h', 'e', 'l', 'l', 'o'};
   auto result = deserializeRow(buf.data(), schema);
   REQUIRE(result.has_value());
   CHECK(std::get<std::string>((*result)[0]) == "hello");

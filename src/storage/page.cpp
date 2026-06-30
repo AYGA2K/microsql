@@ -109,10 +109,26 @@ Page::updateRow(uint16_t slotIndex, const uint8_t *rowBytes, uint16_t rowLen) {
 
   int slotOffset = HEADER_SIZE + slotIndex * SLOT_ENTRY_SIZE;
   uint16_t oldRowOffset = this->read16(slotOffset);
+  uint16_t oldRowLen = this->read16(slotOffset + 2);
+
+  // If the new row is bigger than the old one, write it at the free pointer
+  if (rowLen > oldRowLen) {
+    if (this->freeSpace() < rowLen) {
+      return std::unexpected(PageError::PageFull);
+    }
+    uint16_t freeptr = this->read16(HEADER_OFFSET_FREE_PTR);
+    uint16_t newRowOffset = freeptr - rowLen;
+    // Insert the new row
+    std::memcpy(data + newRowOffset, rowBytes, rowLen);
+    // Update the slot data
+    this->write16(slotOffset, newRowOffset);
+    this->write16(slotOffset + 2, rowLen);
+    this->write16(HEADER_OFFSET_FREE_PTR, newRowOffset);
+    return this->data + newRowOffset;
+  }
 
   std::memcpy(data + oldRowOffset, rowBytes, rowLen);
   this->write16(slotOffset + 2, rowLen);
-
   return this->data + oldRowOffset;
 }
 

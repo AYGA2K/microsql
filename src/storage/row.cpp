@@ -11,7 +11,17 @@ std::expected<std::vector<uint8_t>, RowError> serializeRow(const Row &row,
   if (row.size() != schema.size()) {
     return std::unexpected(RowError::SchemaMismatch);
   }
-  std::vector<uint8_t> output(rowSize(schema));
+  size_t totalSize = 0;
+  for (size_t i = 0; i < row.size(); ++i) {
+    if (schema[i].type == DataType::TEXT) {
+      const std::string &str = std::get<std::string>(row[i]);
+      uint16_t len = static_cast<uint16_t>(std::min(str.size(), static_cast<size_t>(schema[i].textLength)));
+      totalSize += 2 + len;
+    } else {
+      totalSize += schema[i].size();
+    }
+  }
+  std::vector<uint8_t> output(totalSize);
   size_t offset = 0;
   for (size_t i = 0; i < row.size(); ++i) {
     const Value &value = row[i];
@@ -35,11 +45,11 @@ std::expected<std::vector<uint8_t>, RowError> serializeRow(const Row &row,
       break;
     }
     case DataType::TEXT: {
-      const std::string &v = std::get<std::string>(value);
-      // Copy only as many bytes as the string holds
-      size_t len = std::min(v.size(), static_cast<size_t>(schema[i].size()));
-      std::memcpy(output.data() + offset, v.data(), len);
-      offset += schema[i].size();
+      const std::string &str = std::get<std::string>(value);
+      uint16_t len = static_cast<uint16_t>(std::min(str.size(), static_cast<size_t>(schema[i].textLength)));
+      std::memcpy(output.data() + offset, &len, 2);
+      std::memcpy(output.data() + offset + 2, str.data(), len);
+      offset += 2 + len;
       break;
     }
     default:
@@ -77,15 +87,11 @@ std::expected<Row, RowError> deserializeRow(const uint8_t *data,
       break;
     }
     case DataType::TEXT: {
-      std::string val(reinterpret_cast<const char *>(data + offset),
-                      colDef.size());
-      // Strip the null-padding that fills the rest of the fixed-width field
-      size_t end = val.find('\0');
-      if (end != std::string::npos) {
-        val.resize(end);
-      }
-      row.push_back(std::move(val));
-      offset += colDef.size();
+      uint16_t len;
+      std::memcpy(&len, data + offset, 2);
+      std::string str(reinterpret_cast<const char *>(data + offset + 2), len);
+      row.push_back(std::move(str));
+      offset += 2 + len;
       break;
     }
     default:
@@ -96,10 +102,3 @@ std::expected<Row, RowError> deserializeRow(const uint8_t *data,
   return row;
 }
 
-uint16_t rowSize(const Schema &schema) {
-  uint16_t size = 0;
-  for (const ColumnDefinition &col : schema) {
-    size += col.size();
-  }
-  return size;
-}

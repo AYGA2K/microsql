@@ -19,4 +19,3 @@ std::expected<std::vector<uint8_t>, RowError> serializeRow(const Row &row,
 std::expected<Row, RowError> deserializeRow(const uint8_t *data,
                                             const Schema &schema);
 
-uint16_t rowSize(const Schema &schema);
