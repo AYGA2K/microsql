@@ -3,6 +3,7 @@
 #include "ast/statement.h"
 #include "catalog/tableschema.h"
 #include <expected>
+#include <filesystem>
 #include <fstream>
 #include <print>
 #include <sstream>
@@ -115,9 +116,16 @@ std::expected<void, CatalogError> Catalog::addTable(const TableSchema &schema) {
   return {};
 }
 
-void Catalog::dropTable(const std::string &name) {
-  std::erase_if(tables,
-                [&](const TableSchema &t) { return t.tableName == name; });
+std::expected<void, CatalogError> Catalog::dropTable(const std::string &name) {
+  auto it = std::find_if(tables.begin(), tables.end(),
+                         [&](const TableSchema &t) { return t.tableName == name; });
+  if (it == tables.end()) {
+    return std::unexpected(CatalogError::TableNotFound);
+  }
+  std::string filePath = it->filePath;
+  tables.erase(it);
+  std::filesystem::remove(filePath);
+  return {};
 }
 
 void Catalog::save() {

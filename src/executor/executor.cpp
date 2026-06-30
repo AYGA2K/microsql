@@ -427,14 +427,16 @@ std::expected<void, ExecError> execCreateTable(const ParseResult &parseResult,
   }
   auto opened = tableFile->open(tableSchema.filePath);
   if (!opened) {
-    std::println(stderr, "[Executor] failed to open table '{}' after create: {}",
+    std::println(stderr,
+                 "[Executor] failed to open table '{}' after create: {}",
                  tableName, tableFileErrorStr(opened.error()));
     delete tableFile;
     return std::unexpected(ExecError::InternalError);
   }
   auto allocated = tableFile->allocatePage();
   if (!allocated) {
-    std::println(stderr, "[Executor] failed to allocate header page for table '{}': {}",
+    std::println(stderr,
+                 "[Executor] failed to allocate header page for table '{}': {}",
                  tableName, tableFileErrorStr(allocated.error()));
     delete tableFile;
     return std::unexpected(ExecError::InternalError);
@@ -448,6 +450,31 @@ std::expected<void, ExecError> execCreateTable(const ParseResult &parseResult,
   }
   catalog.save();
   ctx.openFiles[tableName] = tableFile;
+  return {};
+}
+
+std::expected<void, ExecError> execDropTable(const ParseResult &parseResult,
+                                             ExecutionContext &ctx) {
+  Catalog &catalog = ctx.catalog;
+  const std::string &tableName = parseResult.statement.tableName;
+
+  if (!catalog.findTable(tableName)) {
+    return std::unexpected(ExecError::TableSchemaNotFound);
+  }
+
+  auto it = ctx.openFiles.find(tableName);
+  if (it != ctx.openFiles.end()) {
+    it->second->close();
+    delete it->second;
+    ctx.openFiles.erase(it);
+  }
+
+  auto ok = catalog.dropTable(tableName);
+  if (!ok) {
+    return std::unexpected(ExecError::InternalError);
+  }
+
+  catalog.save();
   return {};
 }
 
@@ -512,7 +539,13 @@ Result execute(const ParseResult &parseResult, ExecutionContext &ctx) {
     return Result{
         .success = true, .message = "Table created", .columns = {}, .rows = {}};
   }
-  case StatementKind::DROP_TABLE:
+  case StatementKind::DROP_TABLE: {
+    auto ok = execDropTable(parseResult, ctx);
+    if (!ok) {
+      return makeError(ok.error());
+    }
+    return Result{.success = true, .message = "Table dropped", .columns = {}, .rows = {}};
+  }
   case StatementKind::CREATE_INDEX:
   case StatementKind::BEGIN:
   case StatementKind::COMMIT:

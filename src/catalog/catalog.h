@@ -8,7 +8,8 @@ enum class CatalogError {
   FileNotOpen,
   UnvalidTableLineFormat,
   UnvalidColumnLineFormat,
-  DuplicateTable
+  DuplicateTable,
+  TableNotFound,
 };
 
 struct Catalog {
@@ -17,5 +18,5 @@ struct Catalog {
   void save();
   TableSchema *findTable(const std::string &name);
   std::expected<void, CatalogError> addTable(const TableSchema &schema);
-  void dropTable(const std::string &name);
+  std::expected<void, CatalogError> dropTable(const std::string &name);
 };

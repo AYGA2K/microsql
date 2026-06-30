@@ -93,6 +93,9 @@ ParseResult parse(const std::vector<Token> &tokens) {
   case TokenType::DELETE:
     parser.parseDelete();
     break;
+  case TokenType::DROP:
+    parser.parseDrop();
+    break;
   default:
     parser.result.error = "Syntax error at line " + std::to_string(token.line) +
                           ": unexpected token '" + token.value + "'";
@@ -665,6 +668,23 @@ void Parser::parseCreateIndex() {
   }
 
   if (!this->consume(TokenType::RIGHT_PAREN, ")")) {
+    return;
+  }
+
+  if (!this->consume(TokenType::SEMICOLON, ";")) {
+    return;
+  }
+}
+
+void Parser::parseDrop() {
+  this->advance();
+  this->result.statement.kind = StatementKind::DROP_TABLE;
+
+  if (!this->consume(TokenType::TABLE, "TABLE")) {
+    return;
+  }
+
+  if (!this->consumeIdentifier(this->result.statement.tableName, "table name")) {
     return;
   }
 

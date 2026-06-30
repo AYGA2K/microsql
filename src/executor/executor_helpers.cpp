@@ -38,6 +38,8 @@ const char *catalogErrorStr(CatalogError error) {
     return "UnvalidTableLineFormat";
   case CatalogError::UnvalidColumnLineFormat:
     return "UnvalidColumnLineFormat";
+  case CatalogError::TableNotFound:
+    return "TableNotFound";
   }
   return "Unknown";
 }

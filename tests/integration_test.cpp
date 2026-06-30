@@ -103,6 +103,21 @@ TEST_CASE("delete with where then select") {
 }
 
 
+TEST_CASE("drop table removes it") {
+    Cleanup c{{"catalog.txt", "tmp.ms"}};
+    ExecutionContext ctx;
+
+    REQUIRE(run("CREATE TABLE tmp (id INTEGER);", ctx).success);
+    REQUIRE(run("INSERT INTO tmp VALUES (1);", ctx).success);
+
+    auto dr = run("DROP TABLE tmp;", ctx);
+    REQUIRE(dr.success);
+    CHECK(dr.message == "Table dropped");
+
+    auto sel = run("SELECT * FROM tmp;", ctx);
+    REQUIRE_FALSE(sel.success);
+}
+
 TEST_CASE("data persists across execution context reload") {
     Cleanup c{{"catalog.txt", "persist.ms"}};
 
