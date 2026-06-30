@@ -6,7 +6,7 @@
 #include <variant>
 #include <vector>
 
-enum class RowError { SchemaMismatch, DataTypeNotSupported };
+enum class RowError { SchemaMismatch, DataTypeNotSupported, TextTooLong };
 
 // nullptr_t represents SQL NULL
 using Value = std::variant<int64_t, double, std::string, bool, std::nullptr_t>;

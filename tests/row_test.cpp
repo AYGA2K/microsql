@@ -48,6 +48,14 @@ TEST_CASE("serializeRow FLOAT writes correct bytes") {
   CHECK(out == doctest::Approx(3.14));
 }
 
+TEST_CASE("serializeRow TEXT returns TextTooLong when string exceeds textLength") {
+  Schema schema = {makeCol(DataType::TEXT, 5)};
+  Row row = {std::string("toolongstring")};
+  auto result = serializeRow(row, schema);
+  REQUIRE_FALSE(result.has_value());
+  CHECK(result.error() == RowError::TextTooLong);
+}
+
 TEST_CASE("serializeRow TEXT writes correct bytes") {
   Schema schema = {makeCol(DataType::TEXT, 5)};
   Row row = {std::string("hello")};

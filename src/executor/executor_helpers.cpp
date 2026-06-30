@@ -64,6 +64,8 @@ const char *rowErrorStr(RowError error) {
     return "SchemaMismatch";
   case RowError::DataTypeNotSupported:
     return "DataTypeNotSupported";
+  case RowError::TextTooLong:
+    return "TextTooLong";
   }
   return "Unknown";
 }

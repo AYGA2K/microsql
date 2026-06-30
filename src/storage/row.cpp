@@ -15,8 +15,10 @@ std::expected<std::vector<uint8_t>, RowError> serializeRow(const Row &row,
   for (size_t i = 0; i < row.size(); ++i) {
     if (schema[i].type == DataType::TEXT) {
       const std::string &str = std::get<std::string>(row[i]);
-      uint16_t len = static_cast<uint16_t>(std::min(str.size(), static_cast<size_t>(schema[i].textLength)));
-      totalSize += 2 + len;
+      if (str.size() > static_cast<size_t>(schema[i].textLength)) {
+        return std::unexpected(RowError::TextTooLong);
+      }
+      totalSize += 2 + str.size();
     } else {
       totalSize += schema[i].size();
     }
@@ -46,7 +48,7 @@ std::expected<std::vector<uint8_t>, RowError> serializeRow(const Row &row,
     }
     case DataType::TEXT: {
       const std::string &str = std::get<std::string>(value);
-      uint16_t len = static_cast<uint16_t>(std::min(str.size(), static_cast<size_t>(schema[i].textLength)));
+      uint16_t len = static_cast<uint16_t>(str.size());
       std::memcpy(output.data() + offset, &len, 2);
       std::memcpy(output.data() + offset + 2, str.data(), len);
       offset += 2 + len;
