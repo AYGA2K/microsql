@@ -108,6 +108,7 @@ std::expected<Result, ExecError> execSelect(const ParseResult &parseResult,
   }
 
   int whereIndex = parseResult.statement.whereIndex;
+  // Page 0 is reserved, data starts at page 1
   for (size_t pageIndex = 1; pageIndex < numPages.value(); pageIndex++) {
     auto page = readPage(file, pageIndex, parseResult.statement.tableName);
     if (!page) {
@@ -206,6 +207,7 @@ static std::expected<void, ExecError> execInsert(const ParseResult &parseResult,
   }
 
   uint16_t rowSizeBytes = rowSize(schema->columns);
+  // Page 0 is reserved, data starts at page 1
   size_t pageIndex = 1;
   while (pageIndex < numPages.value()) {
     auto page = readPage(file, pageIndex, parseResult.statement.tableName);
@@ -262,6 +264,7 @@ static std::expected<int, ExecError> execDelete(const ParseResult &parseResult,
 
   int deletedCount = 0;
   int whereIndex = parseResult.statement.whereIndex;
+  // Page 0 is reserved, data starts at page 1
   size_t pageIndex = 1;
   while (pageIndex < numPages.value()) {
     auto page = readPage(file, pageIndex, parseResult.statement.tableName);
@@ -335,6 +338,7 @@ static std::expected<int, ExecError> execUpdate(const ParseResult &parseResult,
 
   int updatedCount = 0;
   int whereIndex = parseResult.statement.whereIndex;
+  // Page 0 is reserved, data starts at page 1
   size_t pageIndex = 1;
   while (pageIndex < numPages.value()) {
     auto page = readPage(file, pageIndex, parseResult.statement.tableName);
@@ -433,6 +437,7 @@ std::expected<void, ExecError> execCreateTable(const ParseResult &parseResult,
     delete tableFile;
     return std::unexpected(ExecError::InternalError);
   }
+  // Reserve page 0 so data pages start at index 1
   auto allocated = tableFile->allocatePage();
   if (!allocated) {
     std::println(stderr,

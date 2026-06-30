@@ -30,7 +30,7 @@ struct Result {
 
 struct ExecutionContext {
   Catalog catalog;
-  std::unordered_map<std::string, TableFile *> openFiles;
+  std::unordered_map<std::string, TableFile *> openFiles; // lazily opened on first access
 };
 
 Result execute(const ParseResult &parseResult, ExecutionContext &ctx);

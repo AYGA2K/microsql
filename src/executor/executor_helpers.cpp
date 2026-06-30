@@ -325,7 +325,7 @@ std::expected<bool, ExecError>
 evalWhere(const Expression &expr, const ParseResult &parseResult,
           const Row &row, const std::vector<std::string> &columns) {
   if (expr.kind != ExpressionKind::BINARY) {
-    return true;
+    return true; // non-binary expr => pass through
   }
   const Expression &left = parseResult.expressions[expr.leftIndex];
   const Expression &right = parseResult.expressions[expr.rightIndex];

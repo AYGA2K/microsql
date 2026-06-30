@@ -21,11 +21,13 @@ uint16_t Page::numSlots() const {
 uint16_t Page::freeSpace() const {
   uint16_t freeSpacePtr = this->read16(HEADER_OFFSET_FREE_PTR);
   uint16_t slots = this->numSlots();
+  // Rows grow down from PAGE_SIZE, slot directory grows up from HEADER_SIZE
   return freeSpacePtr - (HEADER_SIZE + slots * SLOT_ENTRY_SIZE);
 }
 
 bool Page::slotDeleted(uint16_t slotIndex) const {
   int slot = HEADER_SIZE + slotIndex * SLOT_ENTRY_SIZE;
+  // A zero length means the slot is deleted
   return this->read16(slot + 2) == 0;
 }
 
@@ -33,7 +35,7 @@ void Page::init(uint32_t id) {
   this->pageId = id;
   std::memset(this->data, 0, PAGE_SIZE);
   this->write16(HEADER_OFFSET_NUM_SLOTS, 0);
-  this->write16(HEADER_OFFSET_FREE_PTR, PAGE_SIZE);
+  this->write16(HEADER_OFFSET_FREE_PTR, PAGE_SIZE); // starts at the end, moves down as rows are added
 }
 
 std::expected<void, PageError> Page::insertRow(const uint8_t *rowBytes,
@@ -107,27 +109,9 @@ Page::updateRow(uint16_t slotIndex, const uint8_t *rowBytes, uint16_t rowLen) {
 
   int slotOffset = HEADER_SIZE + slotIndex * SLOT_ENTRY_SIZE;
   uint16_t oldRowOffset = this->read16(slotOffset);
-  uint16_t oldRowLen = this->read16(slotOffset + 2);
 
-  // If the new row length > than the old row => insert the new updated row at
-  // the top and update the slot data in the slot entry
-  if (rowLen > oldRowLen) {
-    if (this->freeSpace() < rowLen) {
-      return std::unexpected(PageError::PageFull);
-    }
-    uint16_t freeptr = this->read16(HEADER_OFFSET_FREE_PTR);
-    uint16_t newRowOffset = freeptr - rowLen;
-    // Insert the new row
-    std::memcpy(data + newRowOffset, rowBytes, rowLen);
-    // Update the slot data
-    this->write16(slotOffset, newRowOffset);
-    this->write16(slotOffset + 2, rowLen);
-    this->write16(HEADER_OFFSET_FREE_PTR, newRowOffset);
-    oldRowOffset = newRowOffset;
-  } else {
-    std::memcpy(data + oldRowOffset, rowBytes, rowLen);
-    this->write16(slotOffset + 2, rowLen);
-  }
+  std::memcpy(data + oldRowOffset, rowBytes, rowLen);
+  this->write16(slotOffset + 2, rowLen);
 
   return this->data + oldRowOffset;
 }
