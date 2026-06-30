@@ -1,10 +1,11 @@
 #pragma once
 
-#include "buffer_pool/buffer_pool.h"
 #include "catalog/catalog.h"
 #include "parser/parser.h"
+#include "storage/page.h"
 #include "storage/row.h"
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 enum class ExecError {
@@ -29,7 +30,6 @@ struct Result {
 
 struct ExecutionContext {
   Catalog catalog;
-  BufferPool pool;
   std::unordered_map<std::string, TableFile *> openFiles;
 };
 
