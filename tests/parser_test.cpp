@@ -853,7 +853,7 @@ TEST_CASE("CREATE TABLE single TEXT column") {
   REQUIRE(result.statement.columnDefinitions.size() == 1);
   CHECK(result.statement.columnDefinitions[0].name == "name");
   CHECK(result.statement.columnDefinitions[0].type == DataType::TEXT);
-  CHECK(result.statement.columnDefinitions[0].textLength == 0);
+  CHECK(result.statement.columnDefinitions[0].textLength == 255);
 }
 
 TEST_CASE("CREATE TABLE TEXT column with length") {

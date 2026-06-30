@@ -415,7 +415,7 @@ std::expected<void, ExecError> execCreateTable(const ParseResult &parseResult,
   TableSchema tableSchema;
   tableSchema.tableName = tableName;
   tableSchema.columns = parseResult.statement.columnDefinitions;
-  tableSchema.filePath = std::format("{}.microsql", tableName);
+  tableSchema.filePath = std::format("{}.ms", tableName);
   TableFile *tableFile = new TableFile{};
   tableFile->filePath = tableSchema.filePath;
   auto created = tableFile->create();
@@ -446,6 +446,7 @@ std::expected<void, ExecError> execCreateTable(const ParseResult &parseResult,
     delete tableFile;
     return std::unexpected(ExecError::DuplicateTable);
   }
+  catalog.save();
   ctx.openFiles[tableName] = tableFile;
   return {};
 }

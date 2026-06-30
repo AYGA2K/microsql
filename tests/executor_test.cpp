@@ -11,7 +11,7 @@
 
 struct TempTableFile {
   std::string path;
-  TempTableFile(const std::string &tableName) : path(tableName + ".microsql") {}
+  TempTableFile(const std::string &tableName) : path(tableName + ".ms") {}
   ~TempTableFile() { std::remove(path.c_str()); }
   TempTableFile(const TempTableFile &) = delete;
   TempTableFile &operator=(const TempTableFile &) = delete;
@@ -255,14 +255,14 @@ TEST_CASE("execCreateTable registers schema in catalog") {
   REQUIRE(schema->columns.size() == 2);
   CHECK(schema->columns[0].name == "id");
   CHECK(schema->columns[1].name == "age");
-  CHECK(schema->filePath == "employees.microsql");
+  CHECK(schema->filePath == "employees.ms");
 }
 
-TEST_CASE("execCreateTable creates .microsql file on disk") {
+TEST_CASE("execCreateTable creates .ms file on disk") {
   TempTableFile cleanup("employees");
   ExecutionContext ctx;
   REQUIRE(execute(makeCreateTable("employees", {makeCol("id", DataType::INTEGER)}), ctx).success);
-  std::ifstream f("employees.microsql");
+  std::ifstream f("employees.ms");
   CHECK(f.good());
 }
 
