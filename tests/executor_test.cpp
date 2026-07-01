@@ -320,7 +320,7 @@ TEST_CASE("execInsert fills a page and allocates a new one") {
   auto numBefore = tc.tf->numPages();
   REQUIRE(numBefore.has_value());
 
-  int rowsPerPage = (PAGE_SIZE - HEADER_SIZE) / (8 + 8 + SLOT_ENTRY_SIZE);
+  int rowsPerPage = (PAGE_SIZE - HEADER_SIZE) / ((1 + 8) + (1 + 8) + SLOT_ENTRY_SIZE);
   for (int i = 0; i < rowsPerPage + 1; i++) {
     REQUIRE(execute(makeInsert("users", {i, i * 2}), tc.ctx).success);
   }
