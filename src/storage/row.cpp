@@ -13,6 +13,10 @@ std::expected<std::vector<uint8_t>, RowError> serializeRow(const Row &row,
   }
   size_t totalSize = 0;
   for (size_t i = 0; i < row.size(); ++i) {
+    totalSize += 1; // null flag byte
+    if (std::holds_alternative<std::nullptr_t>(row[i])) {
+      continue;
+    }
     if (schema[i].type == DataType::TEXT) {
       const std::string &str = std::get<std::string>(row[i]);
       if (str.size() > static_cast<size_t>(schema[i].textLength)) {
@@ -27,6 +31,13 @@ std::expected<std::vector<uint8_t>, RowError> serializeRow(const Row &row,
   size_t offset = 0;
   for (size_t i = 0; i < row.size(); ++i) {
     const Value &value = row[i];
+    if (std::holds_alternative<std::nullptr_t>(value)) {
+      output[offset] = 1;
+      offset += 1;
+      continue;
+    }
+    output[offset] = 0;
+    offset += 1;
     switch (schema[i].type) {
     case DataType::BOOLEAN: {
       bool v = std::get<bool>(value);
@@ -66,6 +77,12 @@ std::expected<Row, RowError> deserializeRow(const uint8_t *data,
   Row row;
   size_t offset = 0;
   for (const ColumnDefinition &colDef : schema) {
+    bool isNull = data[offset] != 0;
+    offset += 1;
+    if (isNull) {
+      row.push_back(nullptr);
+      continue;
+    }
     switch (colDef.type) {
     case DataType::BOOLEAN: {
       bool val;
