@@ -4,7 +4,7 @@ A SQL database engine built from scratch to learn how databases work. It is writ
 
 ## How it works
 
-**Lexer:**turns the raw SQL string into a list of tokens.
+**Lexer:** — turns the raw SQL string into a list of tokens.
 
 **Parser:** — takes the tokens and produces an AST made of a `Statement` and a list of `Expression`s.
 
