@@ -214,7 +214,7 @@ static std::expected<void, ExecError> execInsert(const ParseResult &parseResult,
     if (!page) {
       return std::unexpected(page.error());
     }
-    if (page.value()->freeSpace() >= rowSizeBytes) {
+    if (page.value()->freeSpace() >= rowSizeBytes + SLOT_ENTRY_SIZE) {
       auto ok =
           insertRowIntoPage(page.value(), rowBytes.value().data(), rowSizeBytes,
                             file, parseResult.statement.tableName);
