@@ -1,6 +1,6 @@
 # microsql
 
-A SQL database engine built from scratch to learn how databases work. It is written in C++23 with no external libraries and has its own lexer, parser, and storage engine.
+SQL database engine written from scratch in C++23 with no external libraries. Has its own lexer, parser, and executor, supports CREATE, INSERT, SELECT with WHERE, UPDATE, and DELETE, and stores data in a custom binary format using 4 KB slotted pages.
 
 ## How it works
 
