@@ -62,6 +62,18 @@ readPage(TableFile *file, size_t pageIndex, const std::string &tableName) {
   return page.value();
 }
 
+static std::expected<void, ExecError>
+writePage(TableFile *file, Page *page, size_t pageIndex,
+          const std::string &tableName) {
+  auto written = file->writePage(*page);
+  if (!written) {
+    std::println(stderr, "[Executor] failed to write page {} of table '{}': {}",
+                 pageIndex, tableName, tableFileErrorStr(written.error()));
+    return std::unexpected(ExecError::InternalError);
+  }
+  return {};
+}
+
 static std::expected<Row, ExecError>
 readSlotRow(Page *page, uint16_t slot, size_t pageIndex,
             const std::string &tableName,
@@ -83,6 +95,66 @@ readSlotRow(Page *page, uint16_t slot, size_t pageIndex,
     return std::unexpected(ExecError::InternalError);
   }
   return row.value();
+}
+
+static int primaryKeyIndex(const std::vector<ColumnDefinition> &columns) {
+  for (size_t i = 0; i < columns.size(); i++) {
+    if (columns[i].primaryKey) {
+      return static_cast<int>(i);
+    }
+  }
+  return -1;
+}
+
+// Returns true if some row already holds value in the primary key column.
+static std::expected<bool, ExecError>
+primaryKeyExists(TableFile *file, const std::string &tableName,
+                 const std::vector<ColumnDefinition> &columns, int pkIndex,
+                 const Value &value, Page *currentPage, size_t currentPageIndex,
+                 int skipSlot) {
+  auto numPages = getNumPages(file, tableName);
+  if (!numPages) {
+    return std::unexpected(numPages.error());
+  }
+
+  // Page 0 is reserved, data starts at page 1
+  for (size_t pageIndex = 1; pageIndex < numPages.value(); pageIndex++) {
+    Page *owned = nullptr;
+    Page *page = nullptr;
+    if (currentPage != nullptr && pageIndex == currentPageIndex) {
+      page = currentPage;
+    } else {
+      auto read = readPage(file, pageIndex, tableName);
+      if (!read) {
+        return std::unexpected(read.error());
+      }
+      owned = read.value();
+      page = owned;
+    }
+
+    uint16_t numSlots = page->numSlots();
+    for (uint16_t slot = 0; slot < numSlots; slot++) {
+      if (page->slotDeleted(slot)) {
+        continue;
+      }
+      if (page == currentPage && skipSlot >= 0 &&
+          slot == static_cast<uint16_t>(skipSlot)) {
+        continue;
+      }
+      auto row = readSlotRow(page, slot, pageIndex, tableName, columns);
+      if (!row) {
+        delete owned;
+        return std::unexpected(row.error());
+      }
+      if (row.value()[pkIndex] == value) {
+        delete owned;
+        return true;
+      }
+    }
+    delete owned;
+  }
+
+  return false;
 }
 
 std::expected<Result, ExecError> execSelect(const ParseResult &parseResult,
@@ -191,6 +263,22 @@ static std::expected<void, ExecError> execInsert(const ParseResult &parseResult,
                  parseResult.statement.tableName, schema->columns.size(),
                  row.value().size());
     return std::unexpected(ExecError::ColumnCountMismatch);
+  }
+
+  int pkIndex = primaryKeyIndex(schema->columns);
+  if (pkIndex != -1) {
+    auto exists =
+        primaryKeyExists(file, parseResult.statement.tableName, schema->columns,
+                         pkIndex, row.value()[pkIndex], nullptr, 0, -1);
+    if (!exists) {
+      return std::unexpected(exists.error());
+    }
+    if (exists.value()) {
+      std::println(stderr,
+                   "[Executor] duplicate primary key on insert into table '{}'",
+                   parseResult.statement.tableName);
+      return std::unexpected(ExecError::PrimaryKeyViolation);
+    }
   }
 
   auto rowBytes = serializeRow(row.value(), schema->columns);
@@ -309,13 +397,10 @@ static std::expected<int, ExecError> execDelete(const ParseResult &parseResult,
         deletedCount++;
       }
     }
-    auto written = file->writePage(*page.value());
+    auto written = writePage(file, page.value(), pageIndex,
+                             parseResult.statement.tableName);
     if (!written) {
-      std::println(stderr,
-                   "[Executor] failed to write page {} of table '{}': {}",
-                   pageIndex, parseResult.statement.tableName,
-                   tableFileErrorStr(written.error()));
-      return std::unexpected(ExecError::InternalError);
+      return std::unexpected(written.error());
     }
     pageIndex++;
   }
@@ -338,6 +423,19 @@ static std::expected<int, ExecError> execUpdate(const ParseResult &parseResult,
 
   int updatedCount = 0;
   int whereIndex = parseResult.statement.whereIndex;
+
+  // Only worth checking when the statement actually assigns the primary key
+  int pkIndex = primaryKeyIndex(schema->columns);
+  bool pkAssigned = false;
+  if (pkIndex != -1) {
+    for (const auto &assignment : parseResult.statement.assignments) {
+      if (assignment.first == schema->columns[pkIndex].name) {
+        pkAssigned = true;
+        break;
+      }
+    }
+  }
+
   // Page 0 is reserved, data starts at page 1
   size_t pageIndex = 1;
   while (pageIndex < numPages.value()) {
@@ -376,6 +474,21 @@ static std::expected<int, ExecError> execUpdate(const ParseResult &parseResult,
         if (!updated) {
           return std::unexpected(updated.error());
         }
+        if (pkAssigned) {
+          auto exists = primaryKeyExists(
+              file, parseResult.statement.tableName, schema->columns, pkIndex,
+              updated.value()[pkIndex], page.value(), pageIndex, slot);
+          if (!exists) {
+            return std::unexpected(exists.error());
+          }
+          if (exists.value()) {
+            std::println(
+                stderr,
+                "[Executor] duplicate primary key on update of table '{}'",
+                parseResult.statement.tableName);
+            return std::unexpected(ExecError::PrimaryKeyViolation);
+          }
+        }
         auto rowBytes = serializeRow(updated.value(), schema->columns);
         if (!rowBytes) {
           std::println(
@@ -397,13 +510,10 @@ static std::expected<int, ExecError> execUpdate(const ParseResult &parseResult,
         updatedCount++;
       }
     }
-    auto written = file->writePage(*page.value());
+    auto written = writePage(file, page.value(), pageIndex,
+                             parseResult.statement.tableName);
     if (!written) {
-      std::println(stderr,
-                   "[Executor] failed to write page {} of table '{}': {}",
-                   pageIndex, parseResult.statement.tableName,
-                   tableFileErrorStr(written.error()));
-      return std::unexpected(ExecError::InternalError);
+      return std::unexpected(written.error());
     }
     pageIndex++;
   }
@@ -549,7 +659,8 @@ Result execute(const ParseResult &parseResult, ExecutionContext &ctx) {
     if (!ok) {
       return makeError(ok.error());
     }
-    return Result{.success = true, .message = "Table dropped", .columns = {}, .rows = {}};
+    return Result{
+        .success = true, .message = "Table dropped", .columns = {}, .rows = {}};
   }
   case StatementKind::CREATE_INDEX:
   case StatementKind::BEGIN:

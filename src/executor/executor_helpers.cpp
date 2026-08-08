@@ -87,6 +87,8 @@ const char *execErrorStr(ExecError error) {
     return "column count mismatch";
   case ExecError::NotNullViolation:
     return "NOT NULL constraint violated";
+  case ExecError::PrimaryKeyViolation:
+    return "duplicate primary key";
   case ExecError::NotImplemented:
     return "not implemented";
   case ExecError::DuplicateTable:

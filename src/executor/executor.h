@@ -16,6 +16,7 @@ enum class ExecError {
   InvalidExpression,
   ColumnCountMismatch,
   NotNullViolation,
+  PrimaryKeyViolation,
   NotImplemented,
   DuplicateTable,
   InternalError,
